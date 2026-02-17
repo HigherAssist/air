@@ -41,29 +41,15 @@ const backend = defineBackend({
 });
 
 // ============================================================
-// Grant post-confirmation Lambda access to the GraphQL API
+// Grant post-confirmation Lambda access to DynamoDB User table
 // ============================================================
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as appsync from 'aws-cdk-lib/aws-appsync';
 
-const graphqlApi = backend.data.resources.graphqlApi as appsync.GraphqlApi;
-
+const userTable = backend.data.resources.tables['User'];
 const postConfirmationLambda = backend.postConfirmation.resources.lambda as lambda.Function;
-postConfirmationLambda.addEnvironment(
-  'AMPLIFY_DATA_GRAPHQL_ENDPOINT',
-  graphqlApi.graphqlUrl
-);
-postConfirmationLambda.addEnvironment(
-  'AMPLIFY_DATA_API_KEY',
-  graphqlApi.apiKey || ''
-);
-postConfirmationLambda.addToRolePolicy(
-  new iam.PolicyStatement({
-    actions: ['appsync:GraphQL'],
-    resources: [`${graphqlApi.arn}/*`],
-  })
-);
+postConfirmationLambda.addEnvironment('USER_TABLE_NAME', userTable.tableName);
+userTable.grantReadWriteData(postConfirmationLambda);
 
 // ============================================================
 // REST API Gateway (CDK escape hatch)

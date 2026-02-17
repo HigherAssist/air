@@ -1,45 +1,10 @@
 import type { PostConfirmationTriggerHandler } from 'aws-lambda';
-import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/api';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { randomUUID } from 'crypto';
 
-const GRAPHQL_ENDPOINT = process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT;
-const API_KEY = process.env.AMPLIFY_DATA_API_KEY;
-
-Amplify.configure({
-  API: {
-    GraphQL: {
-      defaultAuthMode: 'apiKey',
-      endpoint: GRAPHQL_ENDPOINT!,
-      region: process.env.AWS_REGION!,
-      apiKey: API_KEY!,
-    },
-  },
-});
-
-const createUserMutation = /* GraphQL */ `
-  mutation CreateUser($input: CreateUserInput!) {
-    createUser(input: $input) {
-      id
-      firstName
-      lastName
-      email
-      companyName
-      profileRole
-      status
-      subscriptionId
-    }
-  }
-`;
-
-const getUserByEmailQuery = /* GraphQL */ `
-  query GetUserByEmail($email: String!) {
-    getUserByEmail(email: $email) {
-      items {
-        id
-      }
-    }
-  }
-`;
+const TABLE_NAME = process.env.USER_TABLE_NAME!;
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 export const handler: PostConfirmationTriggerHandler = async (event) => {
   // Only create DB record for self-service sign-ups, not admin-created users
@@ -50,25 +15,31 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
   const attrs = event.request.userAttributes;
   const email = attrs.email;
 
-  const client = generateClient();
+  // Check if user already exists (e.g., invited user) using the email GSI
+  const existing = await ddb.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      IndexName: 'usersByEmailAndCompanyName',
+      KeyConditionExpression: 'email = :email',
+      ExpressionAttributeValues: { ':email': email },
+      Limit: 1,
+    })
+  );
 
-  // Check if user already exists (e.g., invited user)
-  const existing: any = await client.graphql({
-    query: getUserByEmailQuery,
-    variables: { email },
-    authMode: 'apiKey',
-  });
-
-  if (existing.data.getUserByEmail.items.length > 0) {
+  if (existing.Items && existing.Items.length > 0) {
     console.log('User already exists in DB, skipping creation');
     return event;
   }
 
+  const now = new Date().toISOString();
+
   // Create new User record
-  await client.graphql({
-    query: createUserMutation,
-    variables: {
-      input: {
+  await ddb.send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        id: randomUUID(),
+        __typename: 'User',
         email,
         firstName: attrs['custom:first_name'] || '',
         lastName: attrs['custom:last_name'] || '',
@@ -81,10 +52,11 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
         apikeytype: '',
         apikey1: '',
         apikey2: '',
+        createdAt: now,
+        updatedAt: now,
       },
-    },
-    authMode: 'apiKey',
-  });
+    })
+  );
 
   console.log(`Created DB user for ${email}`);
   return event;
