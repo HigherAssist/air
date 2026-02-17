@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Authenticator, SignUpAttribute } from '@aws-amplify/ui-react';
+import { Authenticator } from '@aws-amplify/ui-react';
 import { useAuth } from 'shared/hooks';
 
 const SignIn = () => {
@@ -16,13 +16,7 @@ const SignIn = () => {
   return (
     <div className="flex justify-center my-10">
       <Authenticator
-        signUpAttributes={[
-          'email' as SignUpAttribute,
-          'custom:company_name' as SignUpAttribute,
-          'custom:first_name' as SignUpAttribute,
-          'custom:last_name' as SignUpAttribute,
-          'custom:registration_code' as SignUpAttribute,
-        ]}
+        signUpAttributes={['email']}
         formFields={{
           signUp: {
             email: {
