@@ -17,6 +17,21 @@ import outputs from '../amplify_outputs.json';
 
 Amplify.configure(outputs);
 
+// Register custom REST API Gateway so aws-amplify/api get/post can use it
+const existingConfig = Amplify.getConfig();
+Amplify.configure({
+  ...existingConfig,
+  API: {
+    ...existingConfig.API,
+    REST: {
+      AirRestApi: {
+        endpoint: outputs.custom.apiUrl,
+        region: outputs.auth.aws_region,
+      },
+    },
+  },
+});
+
 function App() {
   const navigate = useNavigate();
   const { setUser, error, setError, setIsLoading } = useAuth();
