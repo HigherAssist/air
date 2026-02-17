@@ -12,7 +12,7 @@ frontend:
         - npm ci --cache .npm --prefer-offline
     build:
       commands:
-        - env | grep -e 'VITE_' >> .env
+        - env | grep -e 'VITE_' >> .env || true
         - npm run build
   artifacts:
     baseDirectory: dist
