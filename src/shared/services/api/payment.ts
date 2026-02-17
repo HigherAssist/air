@@ -1,26 +1,37 @@
-import { get, post } from 'aws-amplify/api';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { Amplify } from 'aws-amplify';
 import { Plan } from 'shared/types/plan';
 import { StripeSubscription, StripeCustomer } from 'shared/types/payment';
 
-// The REST API name from amplify_outputs.json custom output
-const REST_API_NAME = 'AirRestApi';
+function getApiUrl(): string {
+  const config = Amplify.getConfig() as any;
+  return config.API?.REST?.AirRestApi?.endpoint || '';
+}
 
-async function authHeaders(): Promise<Record<string, string>> {
+async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const session = await fetchAuthSession();
   const token = session.tokens?.idToken?.toString();
-  return token ? { Authorization: token } : {};
+  const url = `${getApiUrl()}${path}`;
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: token } : {}),
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+  return response;
 }
 
 export class PaymentService {
   public static async getPlans(): Promise<Plan[]> {
-    const response = await get({
-      apiName: REST_API_NAME,
-      path: 'subscription/plans',
-      options: { headers: await authHeaders() },
-    }).response;
-    const plans = (await response.body.json()) as unknown as Plan[];
-    return plans;
+    const response = await authFetch('subscription/plans');
+    return response.json();
   }
 
   public static async createCheckoutSession(payload: {
@@ -31,42 +42,30 @@ export class PaymentService {
     firstName: string;
     lastName: string;
   }): Promise<{ sessionId: string; url: string }> {
-    const response = await post({
-      apiName: REST_API_NAME,
-      path: 'subscription/checkout',
-      options: { body: payload as any, headers: await authHeaders() },
-    }).response;
-    return (await response.body.json()) as unknown as {
-      sessionId: string;
-      url: string;
-    };
+    const response = await authFetch('subscription/checkout', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return response.json();
   }
 
   public static async createPortalSession(payload: {
     stripeCustomerId: string;
     returnUrl: string;
   }): Promise<{ url: string }> {
-    const response = await post({
-      apiName: REST_API_NAME,
-      path: 'subscription/portal',
-      options: { body: payload as any, headers: await authHeaders() },
-    }).response;
-    return (await response.body.json()) as unknown as { url: string };
+    const response = await authFetch('subscription/portal', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return response.json();
   }
 
   public static async getUserSubscriptions(stripeCustomerId: string): Promise<{
     subscriptions: StripeSubscription[];
     customer: StripeCustomer;
   }> {
-    const response = await get({
-      apiName: REST_API_NAME,
-      path: `user/subscriptions/${stripeCustomerId}`,
-      options: { headers: await authHeaders() },
-    }).response;
-    return (await response.body.json()) as unknown as {
-      subscriptions: StripeSubscription[];
-      customer: StripeCustomer;
-    };
+    const response = await authFetch(`user/subscriptions/${stripeCustomerId}`);
+    return response.json();
   }
 
   public static async sendPlanInquiry(payload: {
@@ -75,11 +74,10 @@ export class PaymentService {
     lastName: string;
     companyName: string;
   }): Promise<any> {
-    const response = await post({
-      apiName: REST_API_NAME,
-      path: 'plan/query',
-      options: { body: payload as any, headers: await authHeaders() },
-    }).response;
-    return response.body.json();
+    const response = await authFetch('plan/query', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return response.json();
   }
 }

@@ -1,14 +1,31 @@
-import { post } from 'aws-amplify/api';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { Amplify } from 'aws-amplify';
 import { execute } from 'shared/utils';
 import { CreateInviteUser, User } from 'shared/types/user';
 
-const REST_API_NAME = 'AirRestApi';
+function getApiUrl(): string {
+  const config = Amplify.getConfig() as any;
+  return config.API?.REST?.AirRestApi?.endpoint || '';
+}
 
-async function authHeaders(): Promise<Record<string, string>> {
+async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const session = await fetchAuthSession();
   const token = session.tokens?.idToken?.toString();
-  return token ? { Authorization: token } : {};
+  const url = `${getApiUrl()}${path}`;
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: token } : {}),
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+  return response;
 }
 
 const updateUserMutation = /* GraphQL */ `
@@ -50,30 +67,27 @@ export class UserService {
   public static async createInvitedUser(
     payload: CreateInviteUser
   ): Promise<any> {
-    const response = await post({
-      apiName: REST_API_NAME,
-      path: 'admin/user/create',
-      options: { body: payload as any, headers: await authHeaders() },
-    }).response;
-    return response.body.json();
+    const response = await authFetch('admin/user/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return response.json();
   }
 
   public static async deleteInvitedUser(username: string): Promise<any> {
-    const response = await post({
-      apiName: REST_API_NAME,
-      path: 'admin/user/remove',
-      options: { body: { username } as any, headers: await authHeaders() },
-    }).response;
-    return response.body.json();
+    const response = await authFetch('admin/user/remove', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+    return response.json();
   }
 
   public static async getInvitedUser(username: string) {
-    const response = await post({
-      apiName: REST_API_NAME,
-      path: 'admin/user',
-      options: { body: { username } as any, headers: await authHeaders() },
-    }).response;
-    return response.body.json();
+    const response = await authFetch('admin/user', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+    return response.json();
   }
 
   public static async updateDbUser(data: Record<string, any>) {
