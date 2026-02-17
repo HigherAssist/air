@@ -42,14 +42,43 @@ const backend = defineBackend({
 
 // ============================================================
 // Grant post-confirmation Lambda access to DynamoDB User table
+// (Uses SSM parameter bridge to avoid auth↔data circular dependency)
 // ============================================================
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as cdk from 'aws-cdk-lib';
 
+// Store the User table name in SSM from the data stack (no cross-stack ref)
 const userTable = backend.data.resources.tables['User'];
+const dataStack = cdk.Stack.of(userTable);
+new ssm.StringParameter(dataStack, 'UserTableNameParam', {
+  parameterName: '/air/user-table-name',
+  stringValue: userTable.tableName,
+});
+
+// Configure post-confirmation Lambda (in auth stack) with runtime SSM lookup
 const postConfirmationLambda = backend.postConfirmation.resources.lambda as lambda.Function;
-postConfirmationLambda.addEnvironment('USER_TABLE_NAME', userTable.tableName);
-userTable.grantReadWriteData(postConfirmationLambda);
+postConfirmationLambda.addEnvironment('USER_TABLE_SSM_PARAM', '/air/user-table-name');
+postConfirmationLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['ssm:GetParameter'],
+    resources: [
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/user-table-name`,
+    ],
+  })
+);
+postConfirmationLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: [
+      'dynamodb:PutItem',
+      'dynamodb:Query',
+    ],
+    resources: [
+      `arn:aws:dynamodb:${dataStack.region}:${dataStack.account}:table/*`,
+    ],
+  })
+);
 
 // ============================================================
 // REST API Gateway (CDK escape hatch)

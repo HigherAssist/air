@@ -1,10 +1,23 @@
 import type { PostConfirmationTriggerHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import { randomUUID } from 'crypto';
 
-const TABLE_NAME = process.env.USER_TABLE_NAME!;
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ssmClient = new SSMClient({});
+
+// Cache table name after first SSM lookup (cold start)
+let tableName: string | undefined;
+
+async function getTableName(): Promise<string> {
+  if (tableName) return tableName;
+  const param = await ssmClient.send(
+    new GetParameterCommand({ Name: process.env.USER_TABLE_SSM_PARAM! })
+  );
+  tableName = param.Parameter!.Value!;
+  return tableName;
+}
 
 export const handler: PostConfirmationTriggerHandler = async (event) => {
   // Only create DB record for self-service sign-ups, not admin-created users
@@ -14,6 +27,7 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
 
   const attrs = event.request.userAttributes;
   const email = attrs.email;
+  const TABLE_NAME = await getTableName();
 
   // Check if user already exists (e.g., invited user) using the email GSI
   const existing = await ddb.send(

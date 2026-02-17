@@ -4,5 +4,5 @@ export const postConfirmation = defineFunction({
   name: 'air-post-confirmation',
   entry: './handler.ts',
   timeoutSeconds: 15,
-  resourceGroupName: 'data',
+  resourceGroupName: 'auth',
 });
