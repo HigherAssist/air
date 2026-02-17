@@ -1,8 +1,15 @@
 import { post } from 'aws-amplify/api';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { execute } from 'shared/utils';
 import { CreateInviteUser, User } from 'shared/types/user';
 
 const REST_API_NAME = 'AirRestApi';
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const session = await fetchAuthSession();
+  const token = session.tokens?.idToken?.toString();
+  return token ? { Authorization: token } : {};
+}
 
 const updateUserMutation = /* GraphQL */ `
   mutation UpdateUser($input: UpdateUserInput!) {
@@ -45,8 +52,8 @@ export class UserService {
   ): Promise<any> {
     const response = await post({
       apiName: REST_API_NAME,
-      path: '/admin/user/create',
-      options: { body: payload as any },
+      path: 'admin/user/create',
+      options: { body: payload as any, headers: await authHeaders() },
     }).response;
     return response.body.json();
   }
@@ -54,8 +61,8 @@ export class UserService {
   public static async deleteInvitedUser(username: string): Promise<any> {
     const response = await post({
       apiName: REST_API_NAME,
-      path: '/admin/user/remove',
-      options: { body: { username } as any },
+      path: 'admin/user/remove',
+      options: { body: { username } as any, headers: await authHeaders() },
     }).response;
     return response.body.json();
   }
@@ -63,8 +70,8 @@ export class UserService {
   public static async getInvitedUser(username: string) {
     const response = await post({
       apiName: REST_API_NAME,
-      path: '/admin/user',
-      options: { body: { username } as any },
+      path: 'admin/user',
+      options: { body: { username } as any, headers: await authHeaders() },
     }).response;
     return response.body.json();
   }
