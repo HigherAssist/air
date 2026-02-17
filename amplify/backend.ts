@@ -1,12 +1,13 @@
 import { defineBackend } from '@aws-amplify/backend';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import { auth } from './auth/resource';
+// auth temporarily removed to force user pool recreation
+// import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
-import { preSignup } from './functions/pre-signup/resource';
-import { createAuthChallenge } from './functions/create-auth-challenge/resource';
-import { defineAuthChallenge } from './functions/define-auth-challenge/resource';
-import { verifyAuthChallenge } from './functions/verify-auth-challenge/resource';
+// import { preSignup } from './functions/pre-signup/resource';
+// import { createAuthChallenge } from './functions/create-auth-challenge/resource';
+// import { defineAuthChallenge } from './functions/define-auth-challenge/resource';
+// import { verifyAuthChallenge } from './functions/verify-auth-challenge/resource';
 import { createCognitoUser } from './functions/create-cognito-user/resource';
 import { getCognitoUser } from './functions/get-cognito-user/resource';
 import { deleteAdminUser } from './functions/delete-admin-user/resource';
@@ -19,13 +20,9 @@ import { contactFormTrigger } from './functions/contact-form-trigger/resource';
 import { sendEmailPlanQuery } from './functions/send-email-plan-query/resource';
 
 const backend = defineBackend({
-  auth,
+  // auth temporarily removed to force user pool recreation
   data,
   storage,
-  preSignup,
-  createAuthChallenge,
-  defineAuthChallenge,
-  verifyAuthChallenge,
   createCognitoUser,
   getCognitoUser,
   deleteAdminUser,
@@ -60,19 +57,19 @@ const api = new apigateway.RestApi(apiStack, 'AirRestApi', {
   },
 });
 
-// Cognito Authorizer for protected endpoints
-const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(
-  apiStack,
-  'AirCognitoAuthorizer',
-  {
-    cognitoUserPools: [backend.auth.resources.userPool],
-  }
-);
+// Cognito Authorizer temporarily removed for user pool recreation
+// const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(
+//   apiStack,
+//   'AirCognitoAuthorizer',
+//   {
+//     cognitoUserPools: [backend.auth.resources.userPool],
+//   }
+// );
 
-const authOptions = {
-  authorizer: cognitoAuthorizer,
-  authorizationType: apigateway.AuthorizationType.COGNITO,
-};
+// const authOptions = {
+//   authorizer: cognitoAuthorizer,
+//   authorizationType: apigateway.AuthorizationType.COGNITO,
+// };
 
 // --- Stripe Webhook (PUBLIC - no auth, Stripe needs direct access) ---
 const webhookResource = api.root.addResource('webhook');
@@ -84,34 +81,31 @@ stripeWebhookResource.addMethod(
   )
 );
 
-// --- Subscription endpoints (Cognito auth) ---
+// --- Subscription endpoints (temporarily public during user pool recreation) ---
 const subscriptionResource = api.root.addResource('subscription');
 
 subscriptionResource.addResource('plans').addMethod(
   'GET',
   new apigateway.LambdaIntegration(
     backend.stripeGetPlans.resources.lambda
-  ),
-  authOptions
+  )
 );
 
 subscriptionResource.addResource('checkout').addMethod(
   'POST',
   new apigateway.LambdaIntegration(
     backend.stripeCreateCheckout.resources.lambda
-  ),
-  authOptions
+  )
 );
 
 subscriptionResource.addResource('portal').addMethod(
   'POST',
   new apigateway.LambdaIntegration(
     backend.stripeCustomerPortal.resources.lambda
-  ),
-  authOptions
+  )
 );
 
-// --- User endpoints (Cognito auth) ---
+// --- User endpoints ---
 const userResource = api.root.addResource('user');
 userResource
   .addResource('subscriptions')
@@ -120,11 +114,10 @@ userResource
     'GET',
     new apigateway.LambdaIntegration(
       backend.stripeGetSubscriptions.resources.lambda
-    ),
-    authOptions
+    )
   );
 
-// --- Admin endpoints (Cognito auth) ---
+// --- Admin endpoints ---
 const adminResource = api.root.addResource('admin');
 const adminUserResource = adminResource.addResource('user');
 
@@ -132,34 +125,30 @@ adminUserResource.addResource('create').addMethod(
   'POST',
   new apigateway.LambdaIntegration(
     backend.createCognitoUser.resources.lambda
-  ),
-  authOptions
+  )
 );
 
 adminUserResource.addResource('remove').addMethod(
   'POST',
   new apigateway.LambdaIntegration(
     backend.deleteAdminUser.resources.lambda
-  ),
-  authOptions
+  )
 );
 
 adminUserResource.addMethod(
   'POST',
   new apigateway.LambdaIntegration(
     backend.getCognitoUser.resources.lambda
-  ),
-  authOptions
+  )
 );
 
-// --- Plan inquiry endpoint (Cognito auth) ---
+// --- Plan inquiry endpoint ---
 const planResource = api.root.addResource('plan');
 planResource.addResource('query').addMethod(
   'POST',
   new apigateway.LambdaIntegration(
     backend.sendEmailPlanQuery.resources.lambda
-  ),
-  authOptions
+  )
 );
 
 // ============================================================
