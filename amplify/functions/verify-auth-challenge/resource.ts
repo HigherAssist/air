@@ -4,7 +4,7 @@ export const verifyAuthChallenge = defineFunction({
   name: 'air-verify-auth-challenge',
   entry: './handler.ts',
   environment: {
-    RECAPTCHA_SECRET_KEY: secret('RECAPTCHA_SECRET_KEY'),
+    TURNSTILE_SECRET_KEY: secret('TURNSTILE_SECRET_KEY'),
   },
   timeoutSeconds: 15,
 });

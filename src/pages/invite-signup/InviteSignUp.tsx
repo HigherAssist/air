@@ -14,7 +14,7 @@ import {
   InviteSignInType,
   inviteSignInSchema,
 } from 'shared/validation-schemas/invite-signin';
-import ReCAPTCHA from 'react-google-recaptcha';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { UserService } from 'shared/services';
 import { signIn, confirmSignIn, getCurrentUser } from 'aws-amplify/auth';
 import { useAuth } from 'shared/hooks';
@@ -209,8 +209,8 @@ const InviteSignUp = () => {
           onChange={handlePrivacyCheckbox}
         />
         <div className="flex my-2 flex-row justify-center">
-          <ReCAPTCHA
-            sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || ''}
+          <Turnstile
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || ''}
           />
         </div>
         <Button

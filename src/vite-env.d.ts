@@ -3,7 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_APP_ENV: string;
   readonly VITE_AWS_REGION: string;
-  readonly VITE_RECAPTCHA_SITE_KEY: string;
+  readonly VITE_TURNSTILE_SITE_KEY: string;
   readonly VITE_STRIPE_PUBLISHABLE_KEY: string;
   readonly VITE_APP_URL: string;
   readonly VITE_CHECKOUT_SUCCESS_URL: string;

@@ -1,11 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Authenticator } from '@aws-amplify/ui-react';
+import { signUp, SignUpInput } from 'aws-amplify/auth';
+import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
 import { useAuth } from 'shared/hooks';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 const SignIn = () => {
   const navigate = useNavigate();
   const { isAuthenticated, setUser } = useAuth();
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
+  const turnstileTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -13,10 +19,62 @@ const SignIn = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  const services = {
+    async handleSignUp(input: SignUpInput) {
+      const token = turnstileTokenRef.current;
+      return signUp({
+        username: input.username,
+        password: input.password,
+        options: {
+          userAttributes: input.options?.userAttributes ?? {},
+          validationData: {
+            turnstileToken: token || '',
+          },
+        },
+      });
+    },
+  };
+
   return (
     <div className="flex justify-center my-10">
       <Authenticator
         signUpAttributes={['email']}
+        services={services}
+        components={{
+          SignUp: {
+            Footer() {
+              return (
+                <div className="flex justify-center mb-4">
+                  <Turnstile
+                    ref={turnstileRef}
+                    siteKey={TURNSTILE_SITE_KEY}
+                    onSuccess={(token) => {
+                      turnstileTokenRef.current = token;
+                    }}
+                    onExpire={() => {
+                      turnstileTokenRef.current = null;
+                      turnstileRef.current?.reset();
+                    }}
+                  />
+                </div>
+              );
+            },
+          },
+          ConfirmSignIn: {
+            Footer() {
+              return (
+                <div className="flex justify-center mb-4">
+                  <Turnstile
+                    siteKey={TURNSTILE_SITE_KEY}
+                    onSuccess={(token) => {
+                      turnstileTokenRef.current = token;
+                    }}
+                  />
+                </div>
+              );
+            },
+          },
+        }}
         formFields={{
           signUp: {
             email: {
