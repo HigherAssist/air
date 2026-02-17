@@ -45,20 +45,23 @@ const backend = defineBackend({
 // ============================================================
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as appsync from 'aws-cdk-lib/aws-appsync';
+
+const graphqlApi = backend.data.resources.graphqlApi as appsync.GraphqlApi;
 
 const postConfirmationLambda = backend.postConfirmation.resources.lambda as lambda.Function;
 postConfirmationLambda.addEnvironment(
   'AMPLIFY_DATA_GRAPHQL_ENDPOINT',
-  backend.data.resources.graphqlApi.graphqlUrl
+  graphqlApi.graphqlUrl
 );
 postConfirmationLambda.addEnvironment(
   'AMPLIFY_DATA_API_KEY',
-  backend.data.resources.graphqlApi.apiKey || ''
+  graphqlApi.apiKey || ''
 );
 postConfirmationLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['appsync:GraphQL'],
-    resources: [`${backend.data.resources.graphqlApi.arn}/*`],
+    resources: [`${graphqlApi.arn}/*`],
   })
 );
 
