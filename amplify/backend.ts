@@ -4,6 +4,7 @@ import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { preSignup } from './functions/pre-signup/resource';
+import { postConfirmation } from './functions/post-confirmation/resource';
 import { createAuthChallenge } from './functions/create-auth-challenge/resource';
 import { defineAuthChallenge } from './functions/define-auth-challenge/resource';
 import { verifyAuthChallenge } from './functions/verify-auth-challenge/resource';
@@ -23,6 +24,7 @@ const backend = defineBackend({
   data,
   storage,
   preSignup,
+  postConfirmation,
   createAuthChallenge,
   defineAuthChallenge,
   verifyAuthChallenge,
@@ -37,6 +39,28 @@ const backend = defineBackend({
   contactFormTrigger,
   sendEmailPlanQuery,
 });
+
+// ============================================================
+// Grant post-confirmation Lambda access to the GraphQL API
+// ============================================================
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as iam from 'aws-cdk-lib/aws-iam';
+
+const postConfirmationLambda = backend.postConfirmation.resources.lambda as lambda.Function;
+postConfirmationLambda.addEnvironment(
+  'AMPLIFY_DATA_GRAPHQL_ENDPOINT',
+  backend.data.resources.graphqlApi.graphqlUrl
+);
+postConfirmationLambda.addEnvironment(
+  'AMPLIFY_DATA_API_KEY',
+  backend.data.resources.graphqlApi.apiKey || ''
+);
+postConfirmationLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['appsync:GraphQL'],
+    resources: [`${backend.data.resources.graphqlApi.arn}/*`],
+  })
+);
 
 // ============================================================
 // REST API Gateway (CDK escape hatch)
@@ -165,7 +189,6 @@ planResource.addResource('query').addMethod(
 // ============================================================
 // DynamoDB Stream trigger for Contact form → SES email
 // ============================================================
-import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 
 const contactTable = backend.data.resources.tables['Contact'];
@@ -179,7 +202,6 @@ contactTriggerLambda.addEventSource(
 );
 
 // Grant SES permissions to the contact form trigger Lambda
-import * as iam from 'aws-cdk-lib/aws-iam';
 contactTriggerLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['ses:SendEmail', 'ses:SendRawEmail'],
