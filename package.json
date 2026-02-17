@@ -54,6 +54,7 @@
     "vite": "^5.1.0"
   },
   "optionalDependencies": {
-    "@parcel/watcher-linux-x64-glibc": "^2.5.6"
+    "@parcel/watcher-linux-x64-glibc": "^2.5.6",
+    "@rollup/rollup-linux-x64-gnu": "^4.57.1"
   }
 }
