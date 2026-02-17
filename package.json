@@ -38,6 +38,7 @@
     "@aws-amplify/backend": "^1.21.0",
     "@aws-amplify/backend-cli": "^1.8.2",
     "@types/aws-lambda": "^8.10.160",
+    "@types/node": "^25.2.3",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@types/react-google-recaptcha": "^2.1.6",
