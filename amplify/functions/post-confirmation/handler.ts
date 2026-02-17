@@ -25,53 +25,61 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
     return event;
   }
 
-  const attrs = event.request.userAttributes;
-  const email = attrs.email;
-  const TABLE_NAME = await getTableName();
+  try {
+    const attrs = event.request.userAttributes;
+    const email = attrs.email;
+    const TABLE_NAME = await getTableName();
 
-  // Check if user already exists (e.g., invited user) using the email GSI
-  const existing = await ddb.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: 'usersByEmailAndCompanyName',
-      KeyConditionExpression: 'email = :email',
-      ExpressionAttributeValues: { ':email': email },
-      Limit: 1,
-    })
-  );
+    console.log(`Post-confirmation triggered for ${email}, table: ${TABLE_NAME}`);
 
-  if (existing.Items && existing.Items.length > 0) {
-    console.log('User already exists in DB, skipping creation');
-    return event;
+    // Check if user already exists (e.g., invited user) using the email GSI
+    const existing = await ddb.send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        IndexName: 'usersByEmailAndCompanyName',
+        KeyConditionExpression: 'email = :email',
+        ExpressionAttributeValues: { ':email': email },
+        Limit: 1,
+      })
+    );
+
+    if (existing.Items && existing.Items.length > 0) {
+      console.log('User already exists in DB, skipping creation');
+      return event;
+    }
+
+    const now = new Date().toISOString();
+
+    // Create new User record
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE_NAME,
+        Item: {
+          id: randomUUID(),
+          __typename: 'User',
+          email,
+          firstName: attrs['custom:first_name'] || '',
+          lastName: attrs['custom:last_name'] || '',
+          companyName: attrs['custom:company_name'] || '',
+          phoneNumber: attrs.phone_number || '',
+          profileRole: 'Admin',
+          status: 'Active',
+          subscriptionId: '',
+          atsname: '',
+          apikeytype: '',
+          apikey1: '',
+          apikey2: '',
+          createdAt: now,
+          updatedAt: now,
+        },
+      })
+    );
+
+    console.log(`Created DB user for ${email}`);
+  } catch (error) {
+    // Log error but always return event so Cognito doesn't block sign-up
+    console.error('Post-confirmation error (user sign-up will still succeed):', error);
   }
 
-  const now = new Date().toISOString();
-
-  // Create new User record
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        id: randomUUID(),
-        __typename: 'User',
-        email,
-        firstName: attrs['custom:first_name'] || '',
-        lastName: attrs['custom:last_name'] || '',
-        companyName: attrs['custom:company_name'] || '',
-        phoneNumber: attrs.phone_number || '',
-        profileRole: 'Admin',
-        status: 'Active',
-        subscriptionId: '',
-        atsname: '',
-        apikeytype: '',
-        apikey1: '',
-        apikey2: '',
-        createdAt: now,
-        updatedAt: now,
-      },
-    })
-  );
-
-  console.log(`Created DB user for ${email}`);
   return event;
 };
