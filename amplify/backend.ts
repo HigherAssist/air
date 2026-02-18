@@ -55,9 +55,12 @@ import * as cdk from 'aws-cdk-lib';
 const userTable = backend.data.resources.tables['User'];
 const dataStack = cdk.Stack.of(userTable);
 const ssmParamName = `/air/${dataStack.stackName}/user-table-name`;
-new ssm.StringParameter(dataStack, 'UserTableNameParam', {
-  parameterName: ssmParamName,
-  stringValue: userTable.tableName,
+// Use L1 CfnParameter so CDK doesn't try to compute the SSM ARN at synth time
+// (the L2 StringParameter fails when parameterName is an unresolved token)
+new ssm.CfnParameter(dataStack, 'UserTableNameParam', {
+  name: ssmParamName,
+  type: 'String',
+  value: userTable.tableName,
 });
 
 // Configure post-confirmation Lambda (in auth stack) with runtime SSM lookup
