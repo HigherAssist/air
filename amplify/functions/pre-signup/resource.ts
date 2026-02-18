@@ -5,7 +5,6 @@ export const preSignup = defineFunction({
   entry: './handler.ts',
   environment: {
     TURNSTILE_SECRET_KEY: secret('TURNSTILE_SECRET_KEY'),
-    REGISTRATION_CODES: secret('REGISTRATION_CODES'),
   },
   timeoutSeconds: 15,
 });

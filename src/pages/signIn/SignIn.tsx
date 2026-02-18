@@ -113,12 +113,7 @@ const SignIn = () => {
               label: 'Last Name',
               isRequired: true,
             },
-            'custom:registration_code': {
-              order: 7,
-              placeholder: 'Enter your registration code',
-              label: 'Registration Code',
-              isRequired: true,
-            },
+
           },
         }}
       >
