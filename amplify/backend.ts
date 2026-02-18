@@ -49,22 +49,26 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as cdk from 'aws-cdk-lib';
 
-// Store the User table name in SSM from the data stack (no cross-stack ref)
+// Store the User table name in SSM from the data stack (no cross-stack ref).
+// The parameter name includes the stack name so sandbox and branch deployments
+// never conflict with each other over the same SSM path.
 const userTable = backend.data.resources.tables['User'];
 const dataStack = cdk.Stack.of(userTable);
+const ssmParamName = `/air/${dataStack.stackName}/user-table-name`;
 new ssm.StringParameter(dataStack, 'UserTableNameParam', {
-  parameterName: '/air/user-table-name',
+  parameterName: ssmParamName,
   stringValue: userTable.tableName,
 });
 
 // Configure post-confirmation Lambda (in auth stack) with runtime SSM lookup
 const postConfirmationLambda = backend.postConfirmation.resources.lambda as lambda.Function;
-postConfirmationLambda.addEnvironment('USER_TABLE_SSM_PARAM', '/air/user-table-name');
+postConfirmationLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
 postConfirmationLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['ssm:GetParameter'],
     resources: [
-      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/user-table-name`,
+      // Wildcard on the stack-name segment allows sandbox and all branch deployments
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`,
     ],
   })
 );
