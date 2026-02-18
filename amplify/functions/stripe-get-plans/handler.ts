@@ -22,7 +22,8 @@ export const handler: APIGatewayProxyHandler = async () => {
           id: product.id,
           priceId: price.id,
           name: product.name,
-          code: product.metadata?.code || product.name.toLowerCase(),
+          code: product.metadata?.code ||
+            product.name.toLowerCase().replace(/^(hireassist|air)\s+/i, '').trim(),
           description: product.description || '',
           unitAmount: price.unit_amount || 0,
           currency: price.currency,
