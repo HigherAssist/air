@@ -50,13 +50,15 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as cdk from 'aws-cdk-lib';
 
 // Store the User table name in SSM from the data stack (no cross-stack ref).
-// The parameter name includes the stack name so sandbox and branch deployments
-// never conflict with each other over the same SSM path.
+// AWS_BRANCH is set by Amplify CI/CD for branch builds (dev/stage/main).
+// It is undefined during local sandbox runs, so we fall back to 'sandbox'.
+// Using a process.env value (evaluated at synth time) avoids CDK tokens and
+// therefore avoids creating cross-stack references that cause circular deps.
+const envLabel = process.env.AWS_BRANCH || 'sandbox';
+const ssmParamName = `/air/${envLabel}/user-table-name`;
+
 const userTable = backend.data.resources.tables['User'];
 const dataStack = cdk.Stack.of(userTable);
-const ssmParamName = `/air/${dataStack.stackName}/user-table-name`;
-// Use L1 CfnParameter so CDK doesn't try to compute the SSM ARN at synth time
-// (the L2 StringParameter fails when parameterName is an unresolved token)
 new ssm.CfnParameter(dataStack, 'UserTableNameParam', {
   name: ssmParamName,
   type: 'String',
