@@ -1,25 +1,26 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 import Stripe from 'stripe';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/api';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const sesClient = new SESClient();
+const sesClient = new SESClient({});
 
-const GRAPHQL_ENDPOINT = process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT;
-const API_KEY = process.env.AMPLIFY_DATA_API_KEY;
+const GRAPHQL_ENDPOINT = process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT!;
+const API_KEY = process.env.AMPLIFY_DATA_API_KEY!;
 
-Amplify.configure({
-  API: {
-    GraphQL: {
-      defaultAuthMode: 'apiKey',
-      endpoint: GRAPHQL_ENDPOINT!,
-      region: process.env.AWS_REGION!,
-      apiKey: API_KEY!,
+async function gql(query: string, variables: Record<string, unknown>) {
+  const res = await fetch(GRAPHQL_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': API_KEY,
     },
-  },
-});
+    body: JSON.stringify({ query, variables }),
+  });
+  const json: any = await res.json();
+  if (json.errors?.length) throw new Error(json.errors[0].message);
+  return json.data;
+}
 
 const createUserSubscriptionMutation = /* GraphQL */ `
   mutation CreateUserSubscription($input: CreateUserSubscriptionInput!) {
@@ -69,8 +70,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return { statusCode: 400, body: 'Invalid signature' };
   }
 
-  const client = generateClient();
-
   try {
     switch (stripeEvent.type) {
       case 'checkout.session.completed': {
@@ -80,7 +79,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (!subscriptionId || !userId) break;
 
-        // Fetch full subscription details from Stripe
         const subscription = await stripe.subscriptions.retrieve(
           subscriptionId,
           { expand: ['items.data.price.product'] }
@@ -88,44 +86,33 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const priceItem = subscription.items.data[0];
         const product = priceItem.price.product as Stripe.Product;
 
-        // Create UserSubscription in DynamoDB
-        await client.graphql({
-          query: createUserSubscriptionMutation,
-          variables: {
-            input: {
-              subscriptionId: subscription.id,
-              userId,
-              email: session.customer_email || '',
-              company: session.metadata?.companyName || '',
-              state: subscription.status,
-              planId: priceItem.price.id,
-              planName: product.name,
-              planCode: product.metadata?.code || '',
-              currentPeriodStart: priceItem.current_period_start,
-              currentPeriodEnd: priceItem.current_period_end,
-              trialStart: subscription.trial_start,
-              trialEnd: subscription.trial_end,
-              canceledAt: null,
-              quantity: priceItem.quantity || 1,
-            },
+        await gql(createUserSubscriptionMutation, {
+          input: {
+            subscriptionId: subscription.id,
+            userId,
+            email: session.customer_email || '',
+            company: session.metadata?.companyName || '',
+            state: subscription.status,
+            planId: priceItem.price.id,
+            planName: product.name,
+            planCode: product.metadata?.code || '',
+            currentPeriodStart: priceItem.current_period_start,
+            currentPeriodEnd: priceItem.current_period_end,
+            trialStart: subscription.trial_start,
+            trialEnd: subscription.trial_end,
+            canceledAt: null,
+            quantity: priceItem.quantity || 1,
           },
-          authMode: 'apiKey',
         });
 
-        // Update User with subscriptionId and stripeCustomerId
-        await client.graphql({
-          query: updateUserMutation,
-          variables: {
-            input: {
-              id: userId,
-              subscriptionId: subscription.id,
-              stripeCustomerId: session.customer as string,
-            },
+        await gql(updateUserMutation, {
+          input: {
+            id: userId,
+            subscriptionId: subscription.id,
+            stripeCustomerId: session.customer as string,
           },
-          authMode: 'apiKey',
         });
 
-        // Send notification email
         if (process.env.SES_EMAIL) {
           await sesClient.send(
             new SendEmailCommand({
@@ -148,74 +135,55 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
 
       case 'customer.subscription.updated': {
-        const subscription = stripeEvent.data
-          .object as Stripe.Subscription;
+        const subscription = stripeEvent.data.object as Stripe.Subscription;
         const priceItem = subscription.items.data[0];
 
-        // Find existing UserSubscription
-        const result: any = await client.graphql({
-          query: getUserSubscriptionBySubscriptionIdQuery,
-          variables: { subscriptionId: subscription.id },
-          authMode: 'apiKey',
+        const result: any = await gql(getUserSubscriptionBySubscriptionIdQuery, {
+          subscriptionId: subscription.id,
         });
-        const dbSub =
-          result.data.getUserSubscriptionBySubscriptionId.items[0];
+        const dbSub = result.getUserSubscriptionBySubscriptionId.items[0];
 
         if (dbSub) {
           const product = priceItem.price.product as Stripe.Product | string;
-          const productName =
-            typeof product === 'string' ? '' : product.name;
+          const productName = typeof product === 'string' ? '' : product.name;
           const productCode =
-            typeof product === 'string'
-              ? ''
-              : product.metadata?.code || '';
+            typeof product === 'string' ? '' : product.metadata?.code || '';
 
-          await client.graphql({
-            query: updateUserSubscriptionMutation,
-            variables: {
-              input: {
-                id: dbSub.id,
-                state: subscription.status,
-                planId: priceItem.price.id,
-                planName: productName,
-                planCode: productCode,
-                currentPeriodStart: priceItem.current_period_start,
-                currentPeriodEnd: priceItem.current_period_end,
-                trialStart: subscription.trial_start,
-                trialEnd: subscription.trial_end,
-                canceledAt: subscription.canceled_at,
-                quantity: priceItem.quantity || 1,
-              },
+          await gql(updateUserSubscriptionMutation, {
+            input: {
+              id: dbSub.id,
+              state: subscription.status,
+              planId: priceItem.price.id,
+              planName: productName,
+              planCode: productCode,
+              currentPeriodStart: priceItem.current_period_start,
+              currentPeriodEnd: priceItem.current_period_end,
+              trialStart: subscription.trial_start,
+              trialEnd: subscription.trial_end,
+              canceledAt: subscription.canceled_at,
+              quantity: priceItem.quantity || 1,
             },
-            authMode: 'apiKey',
           });
         }
         break;
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = stripeEvent.data
-          .object as Stripe.Subscription;
+        const subscription = stripeEvent.data.object as Stripe.Subscription;
 
-        const result: any = await client.graphql({
-          query: getUserSubscriptionBySubscriptionIdQuery,
-          variables: { subscriptionId: subscription.id },
-          authMode: 'apiKey',
+        const result: any = await gql(getUserSubscriptionBySubscriptionIdQuery, {
+          subscriptionId: subscription.id,
         });
-        const dbSub =
-          result.data.getUserSubscriptionBySubscriptionId.items[0];
+        const dbSub = result.getUserSubscriptionBySubscriptionId.items[0];
 
         if (dbSub) {
-          await client.graphql({
-            query: updateUserSubscriptionMutation,
-            variables: {
-              input: {
-                id: dbSub.id,
-                state: 'canceled',
-                canceledAt: subscription.canceled_at || Math.floor(Date.now() / 1000),
-              },
+          await gql(updateUserSubscriptionMutation, {
+            input: {
+              id: dbSub.id,
+              state: 'canceled',
+              canceledAt:
+                subscription.canceled_at || Math.floor(Date.now() / 1000),
             },
-            authMode: 'apiKey',
           });
         }
         break;
@@ -223,10 +191,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
       case 'invoice.payment_failed': {
         const invoice = stripeEvent.data.object as Stripe.Invoice;
-        console.log(
-          'Payment failed for subscription:',
-          (invoice as any).subscription
-        );
+        console.log('Payment failed for subscription:', (invoice as any).subscription);
         break;
       }
     }
