@@ -3,7 +3,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Input, PhoneNumberField } from '@aws-amplify/ui-react';
 import { updateUserAttributes } from 'aws-amplify/auth';
-import { useAuth } from 'shared/hooks';
+import useAuth from 'shared/hooks/useAuth';
 import { UserService } from 'shared/services';
 import { ErrorMessage } from 'shared/components';
 import { isError, isErrorMessage } from 'shared/utils';
@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 
 const EditProfile = () => {
   const navigate = useNavigate();
-  const { dbUser } = useAuth();
+  const { dbUser, refreshUser } = useAuth();
 
   const {
     control,
@@ -40,6 +40,7 @@ const EditProfile = () => {
           'custom:first_name': values.firstName,
           'custom:last_name': values.lastName,
           'custom:company_name': values.companyName,
+          phone_number: values.phoneNumber,
         },
       });
 
@@ -51,6 +52,9 @@ const EditProfile = () => {
         companyName: values.companyName,
         phoneNumber: values.phoneNumber,
       });
+
+      // Refresh Zustand store so Profile page shows updated values immediately
+      await refreshUser();
 
       toast.success('Profile updated successfully!');
       navigate('/profile');
@@ -136,6 +140,13 @@ const EditProfile = () => {
           className="w-full bg-BlueLagoon text-white py-2 rounded-md hover:opacity-90 disabled:opacity-50"
         >
           {isSubmitting ? 'Saving...' : 'Save Changes'}
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="w-full border border-gray-300 text-gray-700 py-2 rounded-md hover:bg-gray-50"
+        >
+          Cancel
         </button>
       </form>
     </div>
