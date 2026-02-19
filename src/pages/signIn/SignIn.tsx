@@ -30,6 +30,7 @@ const SignIn = () => {
           validationData: {
             turnstileToken: token || '',
           },
+          autoSignIn: true,
         },
       });
     },
