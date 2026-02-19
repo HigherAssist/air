@@ -242,7 +242,7 @@ contactTriggerLambda.addToRolePolicy(
 // ============================================================
 const webhookLambda = backend.stripeWebhook.resources.lambda as lambda.Function;
 const cfnResources = backend.data.resources.cfnResources as any;
-webhookLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', (backend.data.resources.graphqlApi as any).graphqlUrl);
+webhookLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', cfnResources.cfnGraphqlApi.attrGraphQlUrl);
 webhookLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey?.attrApiKey ?? '');
 
 // Output the API URL so the frontend can use it
