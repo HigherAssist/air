@@ -86,11 +86,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const priceItem = subscription.items.data[0];
         const product = priceItem.price.product as Stripe.Product;
 
+        const customerEmail =
+          session.customer_details?.email || session.customer_email || '';
+
         await gql(createUserSubscriptionMutation, {
           input: {
             subscriptionId: subscription.id,
             userId,
-            email: session.customer_email || '',
+            email: customerEmail,
             company: session.metadata?.companyName || '',
             state: subscription.status,
             planId: priceItem.price.id,
@@ -120,11 +123,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
               Destination: { ToAddresses: [process.env.SES_EMAIL] },
               Message: {
                 Subject: {
-                  Data: `New subscription: ${session.customer_email} - ${product.name}`,
+                  Data: `New subscription: ${customerEmail} - ${product.name}`,
                 },
                 Body: {
                   Text: {
-                    Data: `User ${session.customer_email} subscribed to ${product.name} (${subscription.status})`,
+                    Data: `User ${customerEmail} subscribed to ${product.name} (${subscription.status})`,
                   },
                 },
               },

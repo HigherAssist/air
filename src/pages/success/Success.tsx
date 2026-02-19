@@ -1,20 +1,49 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spinner } from 'shared/components';
+import useAuth from 'shared/hooks/useAuth';
+
+const MAX_ATTEMPTS = 10;
+const POLL_INTERVAL_MS = 3000;
 
 const Success = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
+  const attemptRef = useRef(0);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    // After successful Stripe checkout, redirect to account page
-    // The webhook will have already created the subscription in DynamoDB
-    const timer = setTimeout(() => {
-      navigate('/account');
-    }, 3000);
+    cancelledRef.current = false;
+    attemptRef.current = 0;
 
-    return () => clearTimeout(timer);
+    const poll = async () => {
+      if (cancelledRef.current) return;
+
+      if (attemptRef.current >= MAX_ATTEMPTS) {
+        navigate('/account');
+        return;
+      }
+
+      attemptRef.current += 1;
+
+      await useAuth.getState().refreshUser();
+
+      if (cancelledRef.current) return;
+
+      if (useAuth.getState().dbUser?.stripeCustomerId) {
+        navigate('/account');
+        return;
+      }
+
+      setTimeout(poll, POLL_INTERVAL_MS);
+    };
+
+    poll();
+
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [navigate]);
 
   return (

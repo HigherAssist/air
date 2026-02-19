@@ -38,6 +38,7 @@ interface AuthStore {
   setUser: (user: AuthUser | null) => void;
   setError: (error: string) => void;
   setIsLoading: (isLoading: boolean) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const useAuth = create<AuthStore>((set) => ({
@@ -90,6 +91,21 @@ const useAuth = create<AuthStore>((set) => ({
     }
   },
   setError: (error: string) => set({ error }),
+  refreshUser: async () => {
+    try {
+      const attributes = await fetchUserAttributes();
+      const userItems = await execute(
+        { statement: getUserByEmail, name: 'getUserByEmail' },
+        { email: attributes.email }
+      );
+      const dbUser = userItems.items[0] as User;
+      if (dbUser) {
+        set({ dbUser });
+      }
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+  },
 }));
 
 export default useAuth;
