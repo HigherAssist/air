@@ -244,6 +244,12 @@ const webhookLambda = backend.stripeWebhook.resources.lambda as lambda.Function;
 const cfnResources = backend.data.resources.cfnResources as any;
 webhookLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', cfnResources.cfnGraphqlApi.attrGraphQlUrl);
 webhookLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey?.attrApiKey ?? '');
+webhookLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    resources: ['*'],
+  })
+);
 
 // Output the API URL so the frontend can use it
 backend.addOutput({
