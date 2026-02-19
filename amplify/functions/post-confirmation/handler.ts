@@ -36,7 +36,7 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
     const existing = await ddb.send(
       new QueryCommand({
         TableName: TABLE_NAME,
-        IndexName: 'usersByEmailAndCompanyName',
+        IndexName: 'byEmail',
         KeyConditionExpression: 'email = :email',
         ExpressionAttributeValues: { ':email': email },
         Limit: 1,
