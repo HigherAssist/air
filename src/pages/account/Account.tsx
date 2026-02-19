@@ -206,6 +206,10 @@ const Account = () => {
             <p>
               <strong>Seats:</strong> {activeSubscription.quantity}
             </p>
+            <p>
+              <strong>Subscription ID:</strong>{' '}
+              <span className="font-mono text-sm text-gray-600">{activeSubscription.id}</span>
+            </p>
           </div>
         ) : (
           <p className="text-gray-500">No active subscription found.</p>
