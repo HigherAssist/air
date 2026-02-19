@@ -241,10 +241,9 @@ contactTriggerLambda.addToRolePolicy(
 // (handler uses plain fetch — no Amplify JS browser client in Lambda)
 // ============================================================
 const webhookLambda = backend.stripeWebhook.resources.lambda as lambda.Function;
-const graphqlApi = backend.data.resources.graphqlApi;
 const cfnResources = backend.data.resources.cfnResources as any;
-webhookLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', graphqlApi.graphqlUrl);
-webhookLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey.attrApiKey);
+webhookLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', (backend.data.resources.graphqlApi as any).graphqlUrl);
+webhookLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey?.attrApiKey ?? '');
 
 // Output the API URL so the frontend can use it
 backend.addOutput({
