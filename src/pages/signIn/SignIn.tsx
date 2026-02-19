@@ -38,6 +38,7 @@ const SignIn = () => {
   return (
     <div className="flex justify-center my-10">
       <Authenticator
+        initialState="signIn"
         signUpAttributes={['email']}
         services={services}
         components={{
