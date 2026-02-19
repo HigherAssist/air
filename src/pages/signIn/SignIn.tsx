@@ -113,7 +113,12 @@ const SignIn = () => {
               label: 'Last Name',
               isRequired: true,
             },
-
+            phone_number: {
+              order: 7,
+              placeholder: '+1 555 000 0000',
+              label: 'Phone Number',
+              isRequired: true,
+            },
           },
         }}
       >
