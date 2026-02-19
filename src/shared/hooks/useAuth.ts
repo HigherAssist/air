@@ -39,6 +39,7 @@ interface AuthStore {
   setError: (error: string) => void;
   setIsLoading: (isLoading: boolean) => void;
   refreshUser: () => Promise<void>;
+  clearUser: () => void;
 }
 
 const useAuth = create<AuthStore>((set) => ({
@@ -91,6 +92,14 @@ const useAuth = create<AuthStore>((set) => ({
     }
   },
   setError: (error: string) => set({ error }),
+  clearUser: () =>
+    set({
+      isAuthenticated: false,
+      user: null,
+      dbUser: null,
+      isLoading: false,
+      error: null,
+    }),
   refreshUser: async () => {
     try {
       const attributes = await fetchUserAttributes();

@@ -7,11 +7,12 @@ import { HiMenu } from 'react-icons/hi';
 
 const Navigation = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, dbUser } = useAuth();
+  const { isAuthenticated, dbUser, clearUser } = useAuth();
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      clearUser();
       navigate('/');
     } catch (error) {
       console.error(error);

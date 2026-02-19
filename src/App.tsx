@@ -34,12 +34,13 @@ Amplify.configure({
 
 function App() {
   const navigate = useNavigate();
-  const { setUser, error, setError, setIsLoading } = useAuth();
+  const { setUser, error, setError, setIsLoading, clearUser } = useAuth();
 
   useEffect(() => {
     Hub.listen('auth', (data) => {
       switch (data.payload.event) {
         case 'signedOut':
+          clearUser();
           navigate('/');
           break;
       }
