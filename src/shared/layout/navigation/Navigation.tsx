@@ -4,10 +4,24 @@ import { Menu, Transition } from '@headlessui/react';
 import { signOut } from 'aws-amplify/auth';
 import { useAuth } from 'shared/hooks';
 import { HiMenu } from 'react-icons/hi';
+import { Modal } from 'antd';
 
 const Navigation = () => {
   const navigate = useNavigate();
   const { isAuthenticated, dbUser, clearUser } = useAuth();
+
+  const handleServicesClick = () => {
+    const atsConfigured = dbUser?.atsname && dbUser?.apikeytype && dbUser?.apikey1;
+    if (atsConfigured) {
+      navigate('/services');
+    } else {
+      Modal.info({
+        title: 'ATS Not Configured',
+        content: 'You must configure ATS to access services.',
+        okText: 'OK',
+      });
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -110,14 +124,14 @@ const Navigation = () => {
                       </Menu.Item>
                       <Menu.Item>
                         {({ active }) => (
-                          <Link
-                            to="/services"
+                          <button
+                            onClick={handleServicesClick}
                             className={`${
                               active ? 'bg-gray-100' : ''
-                            } block px-4 py-2 text-sm text-gray-700`}
+                            } block w-full text-left px-4 py-2 text-sm text-gray-700`}
                           >
                             Services
-                          </Link>
+                          </button>
                         )}
                       </Menu.Item>
                       <Menu.Item>

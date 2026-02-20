@@ -247,7 +247,10 @@ const Account = () => {
       {isAdmin && (
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">ATS Configuration</h2>
+            <div>
+              <h2 className="text-lg font-semibold">ATS Configuration</h2>
+              <p className="text-sm text-amber-600">(Must configure ATS in order to access services)</p>
+            </div>
             <Button onClick={() => setIsATSModalOpen(true)}>
               Edit ATS Settings
             </Button>
