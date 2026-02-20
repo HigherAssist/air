@@ -21,7 +21,7 @@ import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 
 const Account = () => {
-  const { dbUser } = useAuth();
+  const { dbUser, refreshUser } = useAuth();
   const { subscriptions, customer } = useSubscriptions();
   const [users, setUsers] = useState<User[]>([]);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -127,6 +127,7 @@ const Account = () => {
         id: dbUser!.id,
         ...values,
       });
+      await refreshUser();
       toast.success('ATS configuration updated!');
       setIsATSModalOpen(false);
     } catch (error) {
