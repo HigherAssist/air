@@ -159,6 +159,12 @@ const Account = () => {
       render: (val: string) => val || 'Unknown',
     },
     {
+      title: 'Company',
+      dataIndex: 'companyName',
+      key: 'companyName',
+      render: (val: string) => val || 'Unknown',
+    },
+    {
       title: 'Role',
       dataIndex: 'profileRole',
       key: 'profileRole',
