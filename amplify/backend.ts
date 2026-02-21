@@ -279,6 +279,12 @@ createCognitoUserLambda.addToRolePolicy(
     resources: [`arn:aws:dynamodb:${dataStack.region}:${dataStack.account}:table/*`],
   })
 );
+createCognitoUserLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['cognito-idp:AdminCreateUser'],
+    resources: [`arn:aws:cognito-idp:${dataStack.region}:${dataStack.account}:userpool/*`],
+  })
+);
 
 const deleteAdminUserLambda = backend.deleteAdminUser.resources.lambda as lambda.Function;
 deleteAdminUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
@@ -296,6 +302,12 @@ deleteAdminUserLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['dynamodb:DeleteItem', 'dynamodb:Query'],
     resources: [`arn:aws:dynamodb:${dataStack.region}:${dataStack.account}:table/*`],
+  })
+);
+deleteAdminUserLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['cognito-idp:AdminDeleteUser'],
+    resources: [`arn:aws:cognito-idp:${dataStack.region}:${dataStack.account}:userpool/*`],
   })
 );
 
