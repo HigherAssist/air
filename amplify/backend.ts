@@ -251,6 +251,15 @@ webhookLambda.addToRolePolicy(
   })
 );
 
+// Inject GraphQL endpoint + API key into admin user Lambdas
+const createCognitoUserLambda = backend.createCognitoUser.resources.lambda as lambda.Function;
+createCognitoUserLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', cfnResources.cfnGraphqlApi.attrGraphQlUrl);
+createCognitoUserLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey?.attrApiKey ?? '');
+
+const deleteAdminUserLambda = backend.deleteAdminUser.resources.lambda as lambda.Function;
+deleteAdminUserLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', cfnResources.cfnGraphqlApi.attrGraphQlUrl);
+deleteAdminUserLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey?.attrApiKey ?? '');
+
 // Output the API URL so the frontend can use it
 backend.addOutput({
   custom: {

@@ -69,6 +69,8 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
           apikeytype: '',
           apikey1: '',
           apikey2: '',
+          acceptedAt: now,
+          activatedAt: now,
           createdAt: now,
           updatedAt: now,
         },
