@@ -4,8 +4,9 @@ import {
   AdminCreateUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/api';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import Stripe from 'stripe';
 import { randomUUID } from 'crypto';
 
@@ -14,41 +15,21 @@ const cognitoClient = new CognitoIdentityProviderClient({
   region: process.env.AWS_REGION,
 });
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ssmClient = new SSMClient({});
 
-const GRAPHQL_ENDPOINT = process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT;
-const API_KEY = process.env.AMPLIFY_DATA_API_KEY;
 const USER_POOL_ID = process.env.AMPLIFY_AUTH_USERPOOL_ID;
 
-Amplify.configure({
-  API: {
-    GraphQL: {
-      defaultAuthMode: 'apiKey',
-      endpoint: GRAPHQL_ENDPOINT!,
-      region: process.env.AWS_REGION!,
-      apiKey: API_KEY!,
-    },
-  },
-});
-
-const createUserMutation = /* GraphQL */ `
-  mutation CreateUser($input: CreateUserInput!) {
-    createUser(input: $input) {
-      id email status inviteToken
-    }
-  }
-`;
-
-const getUserByEmailQuery = /* GraphQL */ `
-  query GetUserByEmail($email: String!) {
-    getUserByEmail(email: $email) {
-      items {
-        id firstName lastName email companyName profileRole status
-        subscriptionId stripeCustomerId
-        atsname apikeytype apikey1 apikey2
-      }
-    }
-  }
-`;
+let tableName: string | undefined;
+async function getTableName(): Promise<string> {
+  if (tableName) return tableName;
+  const param = await ssmClient.send(
+    new GetParameterCommand({ Name: process.env.USER_TABLE_SSM_PARAM! })
+  );
+  const value = param.Parameter!.Value!;
+  tableName = value;
+  return value;
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -60,15 +41,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const body = JSON.parse(event.body || '{}');
 
   try {
-    const client = generateClient();
+    const TABLE_NAME = await getTableName();
 
-    // Fetch admin user to inherit subscription + ATS config
-    const adminResult: any = await client.graphql({
-      query: getUserByEmailQuery,
-      variables: { email: body.adminEmail },
-      authMode: 'apiKey',
-    });
-    const adminUser = adminResult.data.getUserByEmail.items[0];
+    // Fetch admin user from DynamoDB via GSI
+    const adminResult = await ddb.send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        IndexName: 'usersByEmailAndCompanyName',
+        KeyConditionExpression: 'email = :email',
+        ExpressionAttributeValues: { ':email': body.adminEmail },
+        Limit: 1,
+      })
+    );
+    const adminUser = adminResult.Items?.[0];
     if (!adminUser) {
       return {
         statusCode: 400,
@@ -79,7 +64,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const inviteToken = randomUUID();
     const inviteExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const invitedAt = new Date().toISOString();
+    const now = new Date().toISOString();
     const companyName = adminUser.companyName || body.companyName;
 
     // Create Cognito user — inviteToken used as temp password (never shown to user)
@@ -97,13 +82,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       })
     );
 
-    // Create DB user record
-    await client.graphql({
-      query: createUserMutation,
-      variables: {
-        input: {
-          companyName,
+    // Create DB user record directly in DynamoDB
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE_NAME,
+        Item: {
+          id: randomUUID(),
+          __typename: 'User',
           email: body.username,
+          companyName,
           firstName: '',
           lastName: '',
           phoneNumber: '',
@@ -118,10 +105,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
           apikeytype: adminUser.apikeytype || '',
           apikey1: adminUser.apikey1 || '',
           apikey2: adminUser.apikey2 || '',
+          createdAt: now,
+          updatedAt: now,
         },
-      },
-      authMode: 'apiKey',
-    });
+      })
+    );
 
     // Update Stripe subscription quantity +1
     if (adminUser.subscriptionId) {

@@ -251,14 +251,36 @@ webhookLambda.addToRolePolicy(
   })
 );
 
-// Inject GraphQL endpoint + API key into admin user Lambdas
+// Grant createCognitoUser and deleteAdminUser Lambdas access to DynamoDB and SSM
 const createCognitoUserLambda = backend.createCognitoUser.resources.lambda as lambda.Function;
-createCognitoUserLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', cfnResources.cfnGraphqlApi.attrGraphQlUrl);
-createCognitoUserLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey?.attrApiKey ?? '');
+createCognitoUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
+createCognitoUserLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['ssm:GetParameter'],
+    resources: [`arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`],
+  })
+);
+createCognitoUserLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['dynamodb:PutItem', 'dynamodb:Query'],
+    resources: [`arn:aws:dynamodb:${dataStack.region}:${dataStack.account}:table/*`],
+  })
+);
 
 const deleteAdminUserLambda = backend.deleteAdminUser.resources.lambda as lambda.Function;
-deleteAdminUserLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', cfnResources.cfnGraphqlApi.attrGraphQlUrl);
-deleteAdminUserLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey?.attrApiKey ?? '');
+deleteAdminUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
+deleteAdminUserLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['ssm:GetParameter'],
+    resources: [`arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`],
+  })
+);
+deleteAdminUserLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['dynamodb:DeleteItem', 'dynamodb:Query'],
+    resources: [`arn:aws:dynamodb:${dataStack.region}:${dataStack.account}:table/*`],
+  })
+);
 
 // Output the API URL so the frontend can use it
 backend.addOutput({
