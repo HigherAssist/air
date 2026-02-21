@@ -56,6 +56,7 @@ import * as cdk from 'aws-cdk-lib';
 // therefore avoids creating cross-stack references that cause circular deps.
 const envLabel = process.env.AWS_BRANCH || 'sandbox';
 const ssmParamName = `/air/${envLabel}/user-table-name`;
+const ssmUserPoolIdParamName = `/air/${envLabel}/user-pool-id`;
 
 const userTable = backend.data.resources.tables['User'];
 const dataStack = cdk.Stack.of(userTable);
@@ -63,6 +64,14 @@ new ssm.CfnParameter(dataStack, 'UserTableNameParam', {
   name: ssmParamName,
   type: 'String',
   value: userTable.tableName,
+});
+
+// Store user pool ID in SSM (in auth stack) to avoid cross-stack circular dependency
+const authStackRef = cdk.Stack.of(backend.auth.resources.userPool);
+new ssm.CfnParameter(authStackRef, 'UserPoolIdParam', {
+  name: ssmUserPoolIdParamName,
+  type: 'String',
+  value: backend.auth.resources.userPool.userPoolId,
 });
 
 // Configure post-confirmation Lambda (in auth stack) with runtime SSM lookup
@@ -254,10 +263,14 @@ webhookLambda.addToRolePolicy(
 // Grant createCognitoUser and deleteAdminUser Lambdas access to DynamoDB and SSM
 const createCognitoUserLambda = backend.createCognitoUser.resources.lambda as lambda.Function;
 createCognitoUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
+createCognitoUserLambda.addEnvironment('USER_POOL_ID_SSM_PARAM', ssmUserPoolIdParamName);
 createCognitoUserLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['ssm:GetParameter'],
-    resources: [`arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`],
+    resources: [
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`,
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-pool-id`,
+    ],
   })
 );
 createCognitoUserLambda.addToRolePolicy(
@@ -269,10 +282,14 @@ createCognitoUserLambda.addToRolePolicy(
 
 const deleteAdminUserLambda = backend.deleteAdminUser.resources.lambda as lambda.Function;
 deleteAdminUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
+deleteAdminUserLambda.addEnvironment('USER_POOL_ID_SSM_PARAM', ssmUserPoolIdParamName);
 deleteAdminUserLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['ssm:GetParameter'],
-    resources: [`arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`],
+    resources: [
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`,
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-pool-id`,
+    ],
   })
 );
 deleteAdminUserLambda.addToRolePolicy(

@@ -15,9 +15,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ssmClient = new SSMClient({});
 
-const USER_POOL_ID = process.env.AMPLIFY_AUTH_USERPOOL_ID;
-
 let tableName: string | undefined;
+let userPoolId: string | undefined;
+
 async function getTableName(): Promise<string> {
   if (tableName) return tableName;
   const param = await ssmClient.send(
@@ -25,6 +25,16 @@ async function getTableName(): Promise<string> {
   );
   const value = param.Parameter!.Value!;
   tableName = value;
+  return value;
+}
+
+async function getUserPoolId(): Promise<string> {
+  if (userPoolId) return userPoolId;
+  const param = await ssmClient.send(
+    new GetParameterCommand({ Name: process.env.USER_POOL_ID_SSM_PARAM! })
+  );
+  const value = param.Parameter!.Value!;
+  userPoolId = value;
   return value;
 }
 
@@ -39,6 +49,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
   try {
     const TABLE_NAME = await getTableName();
+    const USER_POOL_ID = await getUserPoolId();
 
     // Get DB user first to retrieve subscriptionId before deletion
     const userResult = await ddb.send(
