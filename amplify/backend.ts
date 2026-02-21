@@ -285,6 +285,12 @@ createCognitoUserLambda.addToRolePolicy(
     resources: [`arn:aws:cognito-idp:${dataStack.region}:${dataStack.account}:userpool/*`],
   })
 );
+createCognitoUserLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    resources: ['*'],
+  })
+);
 
 const deleteAdminUserLambda = backend.deleteAdminUser.resources.lambda as lambda.Function;
 deleteAdminUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
