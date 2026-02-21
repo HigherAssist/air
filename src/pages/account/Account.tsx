@@ -143,10 +143,33 @@ const Account = () => {
   );
 
   const userColumns = [
-    { title: 'Name', dataIndex: 'name', key: 'name', render: (_: any, record: User) => `${record.firstName} ${record.lastName}` },
-    { title: 'Email', dataIndex: 'email', key: 'email' },
-    { title: 'Role', dataIndex: 'profileRole', key: 'profileRole' },
-    { title: 'Status', dataIndex: 'status', key: 'status' },
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (_: any, record: User) => {
+        const name = `${record.firstName || ''} ${record.lastName || ''}`.trim();
+        return name || 'Unknown';
+      },
+    },
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+      render: (val: string) => val || 'Unknown',
+    },
+    {
+      title: 'Role',
+      dataIndex: 'profileRole',
+      key: 'profileRole',
+      render: (val: string) => val || 'Unknown',
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (val: string) => val || 'Unknown',
+    },
     ...(isAdmin
       ? [
           {
@@ -225,43 +248,43 @@ const Account = () => {
         )}
       </div>
 
-      {/* Users Table (Admin only) */}
-      {isAdmin && (
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Team Members</h2>
+      {/* Team Members — visible to all, actions admin-only */}
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Team Members</h2>
+          {isAdmin && (
             <Button type="primary" onClick={() => setIsInviteModalOpen(true)}>
               Invite User
             </Button>
-          </div>
-          <Table
-            dataSource={users}
-            columns={userColumns}
-            rowKey="id"
-            pagination={false}
-            size="small"
-          />
+          )}
         </div>
-      )}
+        <Table
+          dataSource={users}
+          columns={userColumns}
+          rowKey="id"
+          pagination={false}
+          size="small"
+        />
+      </div>
 
-      {/* ATS Configuration (Admin only) */}
-      {isAdmin && (
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border">
+      {/* ATS Configuration — visible to all, editable by admin only */}
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h2 className="text-lg font-semibold">ATS Configuration</h2>
               <p className="text-sm text-amber-600">(Must configure ATS in order to access services)</p>
             </div>
-            <Button onClick={() => setIsATSModalOpen(true)}>
-              Edit ATS Settings
-            </Button>
+            {isAdmin && (
+              <Button onClick={() => setIsATSModalOpen(true)}>
+                Edit ATS Settings
+              </Button>
+            )}
           </div>
           <div className="space-y-1 text-sm">
             <p><strong>ATS Name:</strong> {dbUser?.atsname || 'Not configured'}</p>
             <p><strong>API Key Type:</strong> {dbUser?.apikeytype || 'Not configured'}</p>
           </div>
         </div>
-      )}
 
       {/* Invite User Modal */}
       <Modal

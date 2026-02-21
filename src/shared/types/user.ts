@@ -22,6 +22,11 @@ export type User = {
   status: string;
   subscriptionId: string;
   stripeCustomerId?: string;
+  inviteToken?: string;
+  inviteExpiresAt?: string;
+  invitedBy?: string;
+  acceptedAt?: string;
+  activatedAt?: string;
   atsname: string;
   apikeytype: string;
   apikey1: string;

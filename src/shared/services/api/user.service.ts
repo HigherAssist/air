@@ -44,6 +44,7 @@ const getUserByEmailQuery = /* GraphQL */ `
       items {
         id firstName lastName phoneNumber email companyName
         profileRole status subscriptionId stripeCustomerId
+        inviteToken inviteExpiresAt invitedBy acceptedAt activatedAt
         atsname apikeytype apikey1 apikey2
       }
     }

@@ -5,6 +5,7 @@ export const createCognitoUser = defineFunction({
   entry: './handler.ts',
   environment: {
     SES_EMAIL: secret('SES_EMAIL'),
+    STRIPE_SECRET_KEY: secret('STRIPE_SECRET_KEY'),
   },
   timeoutSeconds: 30,
 });

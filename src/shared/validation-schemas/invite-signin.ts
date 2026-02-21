@@ -1,40 +1,35 @@
 import { z } from 'zod';
-import validator from 'validator';
 
 export const inviteSignInSchema = z
   .object({
+    companyName: z
+      .string({ required_error: 'Company Name is required' })
+      .min(1, 'Company Name is required'),
     firstName: z
-      .string({ required_error: 'First Name is a required field' })
-      .min(1, 'First Name is a required field'),
+      .string({ required_error: 'First Name is required' })
+      .min(1, 'First Name is required'),
     lastName: z
-      .string({ required_error: 'Last Name is a required field' })
-      .min(1, 'Last Name is a required field'),
-    oldPassword: z
-      .string({ required_error: 'Old Password is a required field' })
-      .min(1, 'Old Password is a required field'),
-    newPassword: z
-      .string({ required_error: 'New Password is a required field' })
-      .min(1, 'New Password is a required field'),
-    phoneCode: z
-      .string({ required_error: 'Dial code is a required field' })
-      .min(1, 'Dial code is a required field')
-      .default('+1'),
+      .string({ required_error: 'Last Name is required' })
+      .min(1, 'Last Name is required'),
     phoneNumber: z
-      .string({ required_error: 'Phone Number is a required field' })
-      .min(1, 'Phone Number is a required field'),
+      .string({ required_error: 'Phone Number is required' })
+      .min(7, 'Please enter a valid phone number'),
+    password: z
+      .string({ required_error: 'Password is required' })
+      .min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z
+      .string({ required_error: 'Confirm Password is required' })
+      .min(1, 'Confirm Password is required'),
     acknowledge: z
       .boolean()
       .default(false)
-      .refine((value) => value === true, { path: ['acknowledge'] }),
+      .refine((val) => val === true, {
+        message: 'You must agree to the privacy policy and terms',
+      }),
   })
-  .refine(
-    ({ phoneNumber, phoneCode }) => {
-      if (phoneNumber.includes('-')) return false;
-      return validator.isMobilePhone(`${phoneCode}${phoneNumber}`, 'any', {
-        strictMode: true,
-      });
-    },
-    { message: 'Invalid phone number' }
-  );
+  .refine(({ password, confirmPassword }) => password === confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 export type InviteSignInType = z.infer<typeof inviteSignInSchema>;

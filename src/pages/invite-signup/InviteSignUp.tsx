@@ -1,227 +1,301 @@
 import { useEffect, useState } from 'react';
-import {
-  Button,
-  CheckboxField,
-  Input,
-  PhoneNumberField,
-} from '@aws-amplify/ui-react';
+import { Link, LinkProps, useNavigate, useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import { Link, LinkProps, useNavigate, useSearchParams } from 'react-router-dom';
-import { ErrorMessage } from 'shared/components';
-import { isError, isErrorMessage } from 'shared/utils';
-import {
-  InviteSignInType,
-  inviteSignInSchema,
-} from 'shared/validation-schemas/invite-signin';
-import { Turnstile } from '@marsidev/react-turnstile';
-import { UserService } from 'shared/services';
 import { signIn, confirmSignIn, getCurrentUser } from 'aws-amplify/auth';
+import { Turnstile } from '@marsidev/react-turnstile';
+import toast from 'react-hot-toast';
+import { ErrorMessage } from 'shared/components';
+import { isErrorMessage } from 'shared/utils';
+import { inviteSignInSchema, InviteSignInType } from 'shared/validation-schemas/invite-signin';
+import { UserService } from 'shared/services';
 import { useAuth } from 'shared/hooks';
 import { User } from 'shared/types/user';
 
-const StyledLink = (props: LinkProps) => {
-  return (
-    <Link
-      {...props}
-      target="__blank"
-      className="text-blue-500 cursor-pointer"
-    />
-  );
-};
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+
+const StyledLink = (props: LinkProps) => (
+  <Link {...props} target="_blank" className="text-blue-500 cursor-pointer" />
+);
+
+type InviteState = 'loading' | 'invalid' | 'ready' | 'submitting';
 
 const InviteSignUp = () => {
-  const [dbUser, setDbUser] = useState<User | null>(null);
-  const { setUser } = useAuth();
-  const navigate = useNavigate();
   const [params] = useSearchParams();
-  const email = params.get('email');
+  const email = params.get('email') || '';
+  const token = params.get('token') || '';
+  const navigate = useNavigate();
+  const { setUser } = useAuth();
+
+  const [inviteState, setInviteState] = useState<InviteState>('loading');
+  const [dbUser, setDbUser] = useState<User | null>(null);
+
   const {
     control,
-    setValue,
-    formState: { errors, touchedFields, isSubmitting },
     handleSubmit,
+    formState: { errors, isSubmitting },
   } = useForm<InviteSignInType>({
     resolver: zodResolver(inviteSignInSchema),
     mode: 'all',
-    reValidateMode: 'onChange',
-    defaultValues: {},
+    defaultValues: { acknowledge: false },
   });
 
   useEffect(() => {
-    if (email) {
-      UserService.getDbInvitedUser(email)
-        .then((user) => {
-          setDbUser(user);
-          if (user.status !== 'Invited') {
-            navigate('/');
-          }
-        })
-        .catch((error) => {
-          console.error(error);
-        });
-    } else {
+    if (!email || !token) {
       navigate('/');
+      return;
     }
-  }, [email, navigate]);
+
+    const verifyInvite = async () => {
+      try {
+        const user = await UserService.getDbInvitedUser(email);
+
+        if (!user) {
+          toast.error('Invitation not found.');
+          navigate('/');
+          return;
+        }
+
+        if (user.status !== 'Invited' && user.status !== 'Accepted') {
+          toast.error('This invitation has already been used or is no longer valid.');
+          navigate('/');
+          return;
+        }
+
+        if (user.inviteToken !== token) {
+          toast.error('Invalid invitation link.');
+          navigate('/');
+          return;
+        }
+
+        if (user.inviteExpiresAt && new Date(user.inviteExpiresAt) < new Date()) {
+          toast.error('This invitation link has expired. Please ask your admin to re-invite you.');
+          navigate('/');
+          return;
+        }
+
+        // Mark as Accepted if not already
+        if (user.status === 'Invited') {
+          await UserService.updateDbUser({
+            id: user.id,
+            status: 'Accepted',
+            acceptedAt: new Date().toISOString(),
+          });
+        }
+
+        setDbUser(user);
+        setInviteState('ready');
+      } catch (error) {
+        console.error(error);
+        toast.error('Unable to verify invitation. Please try again.');
+        navigate('/');
+      }
+    };
+
+    verifyInvite();
+  }, [email, token, navigate]);
 
   const handleOnSubmit = async (values: InviteSignInType) => {
+    if (!dbUser) return;
     try {
-      const signInResult = await signIn({
-        username: email!,
-        password: values.oldPassword,
-      });
+      // Sign in with invite token as temp password (invisible to user)
+      const signInResult = await signIn({ username: email, password: dbUser.inviteToken! });
 
       if (signInResult.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
-        await confirmSignIn({ challengeResponse: values.newPassword });
-        const user = await getCurrentUser();
-        await UserService.updateDbUser({
-          id: dbUser!.id,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          phoneNumber: `${values.phoneCode}${values.phoneNumber}`,
-          status: 'SignedUp',
-        });
-        setUser(user);
-        navigate('/account');
+        await confirmSignIn({ challengeResponse: values.password });
       }
-    } catch (error) {
+
+      // Update DB user with form data and mark Active
+      await UserService.updateDbUser({
+        id: dbUser.id,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phoneNumber: values.phoneNumber,
+        companyName: values.companyName,
+        status: 'Active',
+        activatedAt: new Date().toISOString(),
+      });
+
+      const currentUser = await getCurrentUser();
+      await setUser(currentUser);
+      navigate('/account');
+    } catch (error: any) {
       console.error(error);
+      toast.error(error.message || 'There was an error completing your registration. Please try again.');
     }
   };
 
-  const handlePhoneDialCodeChange = (event: any) => {
-    setValue('phoneCode', event.target.value);
-  };
-
-  const handlePrivacyCheckbox = (event: any) => {
-    setValue('acknowledge', event.target.checked);
-  };
-
-  const privacyLabelCustomElement = (
-    <div>
-      I agree with{' '}
-      <StyledLink to="/privacy-policy">privacy policy</StyledLink> and{' '}
-      <StyledLink to="/terms-condition">terms & conditions</StyledLink> of this
-      site
-    </div>
-  );
+  if (inviteState === 'loading') {
+    return (
+      <div className="flex justify-center items-center my-20">
+        <p className="text-gray-500">Verifying your invitation…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-md w-full mx-auto my-10 shadow-md p-5 border border-solid border-gray-400">
-      <h2 className="text-lg text-BlueLagoon text-center font-semibold">
-        User Sign-in
-      </h2>
-      <form className="mt-8" onSubmit={handleSubmit(handleOnSubmit)}>
+    <div className="max-w-md w-full mx-auto my-10 shadow-md p-6 border border-solid border-gray-300 rounded-md">
+      <h2 className="text-xl font-semibold text-center mb-1">Create Account</h2>
+      <p className="text-sm text-center text-gray-500 mb-6">
+        You've been invited to join HireAssist AIR.
+      </p>
+
+      <form onSubmit={handleSubmit(handleOnSubmit)} className="space-y-4">
+        {/* Email — pre-filled and locked */}
         <div>
-          <label>Your First Name</label>
+          <label className="block text-sm font-medium mb-1">Email</label>
+          <input
+            type="email"
+            value={email}
+            disabled
+            className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-gray-500 text-sm"
+          />
+        </div>
+
+        {/* Company Name — pre-filled, editable */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Company Name</label>
+          <Controller
+            control={control}
+            name="companyName"
+            defaultValue={dbUser?.companyName || ''}
+            render={({ field }) => (
+              <input
+                {...field}
+                type="text"
+                placeholder="Company Name"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
+          />
+          <ErrorMessage message={isErrorMessage('companyName', errors)} />
+        </div>
+
+        {/* First Name */}
+        <div>
+          <label className="block text-sm font-medium mb-1">First Name</label>
           <Controller
             control={control}
             name="firstName"
             render={({ field }) => (
-              <Input
-                type="text"
-                className="mt-2"
-                placeholder="First Name"
-                hasError={isError('firstName', errors, touchedFields)}
+              <input
                 {...field}
+                type="text"
+                placeholder="First Name"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             )}
           />
           <ErrorMessage message={isErrorMessage('firstName', errors)} />
         </div>
-        <div className="mb-4" />
+
+        {/* Last Name */}
         <div>
-          <label>Your Last Name</label>
+          <label className="block text-sm font-medium mb-1">Last Name</label>
           <Controller
             control={control}
             name="lastName"
             render={({ field }) => (
-              <Input
+              <input
+                {...field}
                 type="text"
                 placeholder="Last Name"
-                className="mt-2"
-                hasError={isError('lastName', errors, touchedFields)}
-                {...field}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             )}
           />
           <ErrorMessage message={isErrorMessage('lastName', errors)} />
         </div>
-        <div className="mb-4" />
-        <Controller
-          control={control}
-          name="phoneNumber"
-          render={({ field }) => (
-            <PhoneNumberField
-              defaultDialCode="+1"
-              label="Phone Number"
-              placeholder="Enter Phone Number"
-              hasError={isError('phoneNumber', errors, touchedFields)}
-              {...field}
-              onDialCodeChange={handlePhoneDialCodeChange}
-            />
-          )}
-        />
-        <ErrorMessage message={isErrorMessage('phoneNumber', errors)} />
-        <div className="mb-4" />
+
+        {/* Phone Number */}
         <div>
-          <label>Old Password</label>
+          <label className="block text-sm font-medium mb-1">Phone Number</label>
           <Controller
             control={control}
-            name="oldPassword"
+            name="phoneNumber"
             render={({ field }) => (
-              <Input
-                type="password"
-                placeholder="Old Password"
-                className="mt-2"
-                hasError={isError('oldPassword', errors, touchedFields)}
+              <input
                 {...field}
+                type="tel"
+                placeholder="+1 555 000 0000"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             )}
           />
-          <ErrorMessage message={isErrorMessage('oldPassword', errors)} />
+          <ErrorMessage message={isErrorMessage('phoneNumber', errors)} />
         </div>
-        <div className="mb-4" />
+
+        {/* Password */}
         <div>
-          <label>New Password</label>
+          <label className="block text-sm font-medium mb-1">Password</label>
           <Controller
             control={control}
-            name="newPassword"
+            name="password"
             render={({ field }) => (
-              <Input
-                type="password"
-                placeholder="New Password"
-                className="mt-2"
-                hasError={isError('newPassword', errors, touchedFields)}
+              <input
                 {...field}
+                type="password"
+                placeholder="Create a password"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             )}
           />
-          <ErrorMessage message={isErrorMessage('newPassword', errors)} />
+          <ErrorMessage message={isErrorMessage('password', errors)} />
         </div>
-        <div className="mb-4" />
-        <CheckboxField
-          hasError={!!errors['acknowledge']}
-          name="custom:acknowledgement"
-          value="yes"
-          label={privacyLabelCustomElement}
-          onChange={handlePrivacyCheckbox}
-        />
-        <div className="flex my-2 flex-row justify-center">
-          <Turnstile
-            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || ''}
+
+        {/* Confirm Password */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Confirm Password</label>
+          <Controller
+            control={control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <input
+                {...field}
+                type="password"
+                placeholder="Confirm your password"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           />
+          <ErrorMessage message={isErrorMessage('confirmPassword', errors)} />
         </div>
-        <Button
-          isLoading={isSubmitting}
-          className="my-4"
+
+        {/* Privacy / Terms */}
+        <div className="flex items-start gap-2">
+          <Controller
+            control={control}
+            name="acknowledge"
+            render={({ field }) => (
+              <input
+                type="checkbox"
+                id="acknowledge"
+                checked={field.value}
+                onChange={field.onChange}
+                className="mt-1"
+              />
+            )}
+          />
+          <label htmlFor="acknowledge" className="text-sm text-gray-600">
+            I agree with the{' '}
+            <StyledLink to="/privacy-policy">privacy policy</StyledLink> and{' '}
+            <StyledLink to="/terms-condition">terms &amp; conditions</StyledLink>
+          </label>
+        </div>
+        <ErrorMessage message={isErrorMessage('acknowledge', errors)} />
+
+        {/* Turnstile */}
+        <div className="flex justify-center">
+          <Turnstile siteKey={TURNSTILE_SITE_KEY} />
+        </div>
+
+        <button
           type="submit"
-          variation="primary"
-          isFullWidth
+          disabled={isSubmitting}
+          className="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Sign In
-        </Button>
+          {isSubmitting ? 'Creating Account…' : 'Create Account'}
+        </button>
       </form>
     </div>
   );
