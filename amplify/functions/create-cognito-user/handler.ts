@@ -73,7 +73,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       };
     }
 
-    const inviteToken = randomUUID();
+    const inviteToken = `Tmp1!${randomUUID()}`;
     const inviteExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const now = new Date().toISOString();
     const companyName = adminUser.companyName || body.companyName;
