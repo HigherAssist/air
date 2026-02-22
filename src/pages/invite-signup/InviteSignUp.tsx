@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { Link, LinkProps, useNavigate, useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import { signIn, confirmSignIn, getCurrentUser } from 'aws-amplify/auth';
+import { signIn, signOut, confirmSignIn, getCurrentUser } from 'aws-amplify/auth';
+import { PhoneNumberField } from '@aws-amplify/ui-react';
 import { Turnstile } from '@marsidev/react-turnstile';
 import toast from 'react-hot-toast';
 import { ErrorMessage } from 'shared/components';
@@ -29,6 +30,7 @@ const InviteSignUp = () => {
 
   const [inviteState, setInviteState] = useState<InviteState>('loading');
   const [dbUser, setDbUser] = useState<User | null>(null);
+  const [dialCode, setDialCode] = useState('+1');
 
   const {
     control,
@@ -98,6 +100,9 @@ const InviteSignUp = () => {
   const handleOnSubmit = async (values: InviteSignInType) => {
     if (!dbUser) return;
     try {
+      // Sign out any existing session before signing in with invite token
+      try { await signOut(); } catch (_) { /* ignore if no session */ }
+
       // Sign in with invite token as temp password (invisible to user)
       const signInResult = await signIn({ username: email, password: dbUser.inviteToken! });
 
@@ -110,7 +115,7 @@ const InviteSignUp = () => {
         id: dbUser.id,
         firstName: values.firstName,
         lastName: values.lastName,
-        phoneNumber: values.phoneNumber,
+        phoneNumber: `${dialCode}${values.phoneNumber.replace(/\D/g, '')}`,
         companyName: values.companyName,
         status: 'Active',
         activatedAt: new Date().toISOString(),
@@ -209,16 +214,18 @@ const InviteSignUp = () => {
 
         {/* Phone Number */}
         <div>
-          <label className="block text-sm font-medium mb-1">Phone Number</label>
           <Controller
             control={control}
             name="phoneNumber"
             render={({ field }) => (
-              <input
-                {...field}
-                type="tel"
-                placeholder="+1 555 000 0000"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <PhoneNumberField
+                label="Phone Number"
+                defaultDialCode="+1"
+                placeholder="555 000 0000"
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                onDialCodeChange={(e: ChangeEvent<HTMLSelectElement>) => setDialCode(e.target.value)}
               />
             )}
           />
