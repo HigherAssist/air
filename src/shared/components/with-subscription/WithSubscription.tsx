@@ -8,7 +8,13 @@ import { Spinner } from 'shared/components';
 const getUserSubscriptionBySubscriptionIdQuery = /* GraphQL */ `
   query GetUserSubscriptionBySubscriptionId($subscriptionId: String!) {
     getUserSubscriptionBySubscriptionId(subscriptionId: $subscriptionId) {
-      items { id subscriptionId state }
+      items {
+        id subscriptionId state
+        planId planName planCode
+        currentPeriodStart currentPeriodEnd
+        trialStart trialEnd canceledAt
+        quantity
+      }
     }
   }
 `;
@@ -54,6 +60,21 @@ const WithSubscription = <P extends object>(
               (s: any) => s.state === 'active' || s.state === 'trialing'
             );
             if (activeSub) {
+              setSubscriptions([{
+                id: activeSub.subscriptionId,
+                status: activeSub.state,
+                plan: {
+                  id: activeSub.planId || '',
+                  name: activeSub.planName || '',
+                  code: activeSub.planCode || '',
+                },
+                currentPeriodStart: activeSub.currentPeriodStart || 0,
+                currentPeriodEnd: activeSub.currentPeriodEnd || 0,
+                trialStart: activeSub.trialStart || null,
+                trialEnd: activeSub.trialEnd || null,
+                canceledAt: activeSub.canceledAt || null,
+                quantity: activeSub.quantity || 1,
+              }]);
               setLoading(false);
               return;
             }
