@@ -95,13 +95,14 @@ const Account = () => {
       setIsInviteModalOpen(false);
       inviteForm.reset();
       // Refresh users list and subscription seat count
-      const [usersList, { subscriptions: updatedSubs, customer: updatedCustomer }] = await Promise.all([
-        UserService.getDbUserBySubscriptionId(user.subscriptionId),
-        PaymentService.getUserSubscriptions(user.stripeCustomerId),
-      ]);
+      const usersList = await UserService.getDbUserBySubscriptionId(user.subscriptionId);
       setUsers(usersList);
-      setSubscriptions(updatedSubs);
-      setCustomer(updatedCustomer);
+      if (user.stripeCustomerId) {
+        const { subscriptions: updatedSubs, customer: updatedCustomer } =
+          await PaymentService.getUserSubscriptions(user.stripeCustomerId);
+        setSubscriptions(updatedSubs);
+        setCustomer(updatedCustomer);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Failed to invite user.');
