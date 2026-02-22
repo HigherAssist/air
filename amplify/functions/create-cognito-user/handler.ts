@@ -59,7 +59,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const adminResult = await ddb.send(
       new QueryCommand({
         TableName: TABLE_NAME,
-        IndexName: 'byEmail',
+        IndexName: 'usersByEmailAndCompanyName',
         KeyConditionExpression: 'email = :email',
         ExpressionAttributeValues: { ':email': body.adminEmail },
         Limit: 1,
