@@ -30,6 +30,18 @@ async function getUserPoolId(): Promise<string> {
   return value;
 }
 
+let tableName: string | undefined;
+
+async function getTableName(): Promise<string> {
+  if (tableName) return tableName;
+  const param = await ssmClient.send(
+    new GetParameterCommand({ Name: process.env.USER_TABLE_SSM_PARAM! })
+  );
+  const value = param.Parameter!.Value!;
+  tableName = value;
+  return value;
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': '*',
@@ -40,14 +52,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const body = JSON.parse(event.body || '{}');
 
   try {
-    const TABLE_NAME = process.env.USER_TABLE_NAME!;
+    const TABLE_NAME = await getTableName();
     const USER_POOL_ID = await getUserPoolId();
 
     // Fetch admin user from DynamoDB via GSI
     const adminResult = await ddb.send(
       new QueryCommand({
         TableName: TABLE_NAME,
-        IndexName: 'usersByEmailAndCompanyName',
+        IndexName: 'byEmail',
         KeyConditionExpression: 'email = :email',
         ExpressionAttributeValues: { ':email': body.adminEmail },
         Limit: 1,

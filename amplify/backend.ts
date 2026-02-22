@@ -262,7 +262,7 @@ webhookLambda.addToRolePolicy(
 
 // Grant createCognitoUser and deleteAdminUser Lambdas access to DynamoDB and SSM
 const createCognitoUserLambda = backend.createCognitoUser.resources.lambda as lambda.Function;
-createCognitoUserLambda.addEnvironment('USER_TABLE_NAME', userTable.tableName);
+createCognitoUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
 createCognitoUserLambda.addEnvironment('USER_POOL_ID_SSM_PARAM', ssmUserPoolIdParamName);
 createCognitoUserLambda.addEnvironment(
   'AMPLIFY_APP_ORIGIN',
@@ -274,6 +274,7 @@ createCognitoUserLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['ssm:GetParameter'],
     resources: [
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`,
       `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-pool-id`,
     ],
   })
@@ -298,12 +299,13 @@ createCognitoUserLambda.addToRolePolicy(
 );
 
 const deleteAdminUserLambda = backend.deleteAdminUser.resources.lambda as lambda.Function;
-deleteAdminUserLambda.addEnvironment('USER_TABLE_NAME', userTable.tableName);
+deleteAdminUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
 deleteAdminUserLambda.addEnvironment('USER_POOL_ID_SSM_PARAM', ssmUserPoolIdParamName);
 deleteAdminUserLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['ssm:GetParameter'],
     resources: [
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`,
       `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-pool-id`,
     ],
   })
