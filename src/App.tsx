@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import './App.css';
 import { Routes } from 'routes';
 import { Amplify } from 'aws-amplify';
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { getCurrentUser } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 import '@aws-amplify/ui-react/styles.css';
 import { useEffect } from 'react';
@@ -34,7 +34,7 @@ Amplify.configure({
 
 function App() {
   const navigate = useNavigate();
-  const { setUser, error, setError, setIsLoading, clearUser } = useAuth();
+  const { setUser, error, setError, setIsLoading, clearUser, isAuthenticated, checkSessionRevoked } = useAuth();
 
   useEffect(() => {
     Hub.listen('auth', (data) => {
@@ -63,6 +63,12 @@ function App() {
 
     getAuthenticatedUser();
   }, [setUser, setIsLoading]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(checkSessionRevoked, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, checkSessionRevoked]);
 
   useEffect(() => {
     if (error === '') return;

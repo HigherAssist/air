@@ -35,11 +35,13 @@ interface AuthStore {
   isLoading: boolean;
   user: AuthUser | null;
   error: string | null;
+  sessionRevoked: boolean;
   setUser: (user: AuthUser | null) => void;
   setError: (error: string) => void;
   setIsLoading: (isLoading: boolean) => void;
   refreshUser: () => Promise<void>;
   clearUser: () => void;
+  checkSessionRevoked: () => Promise<void>;
 }
 
 const useAuth = create<AuthStore>((set) => ({
@@ -48,6 +50,7 @@ const useAuth = create<AuthStore>((set) => ({
   user: null,
   error: null,
   isAuthenticated: false,
+  sessionRevoked: false,
   setIsLoading: (isLoading: boolean) =>
     set({
       isLoading,
@@ -113,6 +116,22 @@ const useAuth = create<AuthStore>((set) => ({
       }
     } catch (error) {
       console.error('Failed to refresh user:', error);
+    }
+  },
+  checkSessionRevoked: async () => {
+    try {
+      // If Cognito session is still valid but DB record is gone, user was removed
+      const attributes = await fetchUserAttributes();
+      const userItems = await execute(
+        { statement: getUserByEmail, name: 'getUserByEmail' },
+        { email: attributes.email }
+      );
+      const dbUser = userItems.items[0];
+      if (!dbUser) {
+        set({ sessionRevoked: true });
+      }
+    } catch {
+      // Cognito session expired naturally — normal auth flow handles this
     }
   },
 }));
