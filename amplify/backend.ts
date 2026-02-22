@@ -264,6 +264,12 @@ webhookLambda.addToRolePolicy(
 const createCognitoUserLambda = backend.createCognitoUser.resources.lambda as lambda.Function;
 createCognitoUserLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
 createCognitoUserLambda.addEnvironment('USER_POOL_ID_SSM_PARAM', ssmUserPoolIdParamName);
+createCognitoUserLambda.addEnvironment(
+  'AMPLIFY_APP_ORIGIN',
+  envLabel === 'sandbox'
+    ? 'http://localhost:5173'
+    : `https://${envLabel}.d3carnh06cjb9r.amplifyapp.com`
+);
 createCognitoUserLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['ssm:GetParameter'],
