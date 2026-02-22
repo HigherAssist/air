@@ -108,7 +108,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
           profileRole: 'User',
           status: 'Invited',
           subscriptionId: adminUser.subscriptionId || '',
-          stripeCustomerId: '',
+          stripeCustomerId: adminUser.stripeCustomerId || '',
           inviteToken,
           inviteExpiresAt,
           invitedBy: body.adminEmail,
