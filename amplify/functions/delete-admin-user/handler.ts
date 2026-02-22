@@ -2,6 +2,7 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 import {
   CognitoIdentityProviderClient,
   AdminDeleteUserCommand,
+  AdminUserGlobalSignOutCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
@@ -63,6 +64,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       })
     );
     const user = userResult.Items?.[0];
+
+    // Revoke all active sessions before deleting
+    try {
+      await cognitoClient.send(
+        new AdminUserGlobalSignOutCommand({
+          Username: body.username,
+          UserPoolId: USER_POOL_ID,
+        })
+      );
+    } catch (signOutError) {
+      // Non-fatal: user may not have active sessions
+      console.warn('AdminUserGlobalSignOut failed (non-fatal):', signOutError);
+    }
 
     // Delete from Cognito
     await cognitoClient.send(

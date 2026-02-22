@@ -109,23 +109,32 @@ const Account = () => {
     }
   };
 
-  const handleRemoveUser = async (username: string) => {
-    try {
-      await UserService.deleteInvitedUser(username);
-      toast.success('User removed successfully!');
-      if (dbUser?.subscriptionId && dbUser?.stripeCustomerId) {
-        const [usersList, { subscriptions: updatedSubs, customer: updatedCustomer }] = await Promise.all([
-          UserService.getDbUserBySubscriptionId(dbUser.subscriptionId),
-          PaymentService.getUserSubscriptions(dbUser.stripeCustomerId),
-        ]);
-        setUsers(usersList);
-        setSubscriptions(updatedSubs);
-        setCustomer(updatedCustomer);
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to remove user.');
-    }
+  const handleRemoveUser = (username: string, displayName: string) => {
+    Modal.confirm({
+      title: 'Remove Team Member',
+      content: `Are you sure you want to remove ${displayName}? This will immediately revoke their access and cannot be undone.`,
+      okText: 'Remove',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await UserService.deleteInvitedUser(username);
+          toast.success('User removed successfully!');
+          if (dbUser?.subscriptionId && dbUser?.stripeCustomerId) {
+            const [usersList, { subscriptions: updatedSubs, customer: updatedCustomer }] = await Promise.all([
+              UserService.getDbUserBySubscriptionId(dbUser.subscriptionId),
+              PaymentService.getUserSubscriptions(dbUser.stripeCustomerId),
+            ]);
+            setUsers(usersList);
+            setSubscriptions(updatedSubs);
+            setCustomer(updatedCustomer);
+          }
+        } catch (error) {
+          console.error(error);
+          toast.error('Failed to remove user.');
+        }
+      },
+    });
   };
 
   const handleUpdateATS = async (values: EditATSType) => {
@@ -193,7 +202,10 @@ const Account = () => {
                 <Button
                   danger
                   size="small"
-                  onClick={() => handleRemoveUser(record.email)}
+                  onClick={() => {
+                    const name = `${record.firstName || ''} ${record.lastName || ''}`.trim() || record.email;
+                    handleRemoveUser(record.email, name);
+                  }}
                 >
                   Remove
                 </Button>
