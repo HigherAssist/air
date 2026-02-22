@@ -22,7 +22,7 @@ import dayjs from 'dayjs';
 
 const Account = () => {
   const { dbUser, refreshUser } = useAuth();
-  const { subscriptions, customer } = useSubscriptions();
+  const { subscriptions, customer, setSubscriptions, setCustomer } = useSubscriptions();
   const [users, setUsers] = useState<User[]>([]);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isATSModalOpen, setIsATSModalOpen] = useState(false);
@@ -94,11 +94,14 @@ const Account = () => {
       toast.success('User invited successfully!');
       setIsInviteModalOpen(false);
       inviteForm.reset();
-      // Refresh users
-      const usersList = await UserService.getDbUserBySubscriptionId(
-        user.subscriptionId
-      );
+      // Refresh users list and subscription seat count
+      const [usersList, { subscriptions: updatedSubs, customer: updatedCustomer }] = await Promise.all([
+        UserService.getDbUserBySubscriptionId(user.subscriptionId),
+        PaymentService.getUserSubscriptions(user.stripeCustomerId),
+      ]);
       setUsers(usersList);
+      setSubscriptions(updatedSubs);
+      setCustomer(updatedCustomer);
     } catch (error) {
       console.error(error);
       toast.error('Failed to invite user.');
@@ -109,11 +112,14 @@ const Account = () => {
     try {
       await UserService.deleteInvitedUser(username);
       toast.success('User removed successfully!');
-      if (dbUser?.subscriptionId) {
-        const usersList = await UserService.getDbUserBySubscriptionId(
-          dbUser.subscriptionId
-        );
+      if (dbUser?.subscriptionId && dbUser?.stripeCustomerId) {
+        const [usersList, { subscriptions: updatedSubs, customer: updatedCustomer }] = await Promise.all([
+          UserService.getDbUserBySubscriptionId(dbUser.subscriptionId),
+          PaymentService.getUserSubscriptions(dbUser.stripeCustomerId),
+        ]);
         setUsers(usersList);
+        setSubscriptions(updatedSubs);
+        setCustomer(updatedCustomer);
       }
     } catch (error) {
       console.error(error);

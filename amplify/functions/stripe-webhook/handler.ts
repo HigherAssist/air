@@ -138,8 +138,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
 
       case 'customer.subscription.updated': {
-        const subscription = stripeEvent.data.object as Stripe.Subscription;
+        const rawSub = stripeEvent.data.object as Stripe.Subscription;
+
+        // Retrieve with expansion so product name/code are available
+        const subscription = await stripe.subscriptions.retrieve(rawSub.id, {
+          expand: ['items.data.price.product'],
+        });
         const priceItem = subscription.items.data[0];
+        const product = priceItem.price.product as Stripe.Product;
 
         const result: any = await gql(getUserSubscriptionBySubscriptionIdQuery, {
           subscriptionId: subscription.id,
@@ -147,18 +153,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const dbSub = result.getUserSubscriptionBySubscriptionId.items[0];
 
         if (dbSub) {
-          const product = priceItem.price.product as Stripe.Product | string;
-          const productName = typeof product === 'string' ? '' : product.name;
-          const productCode =
-            typeof product === 'string' ? '' : product.metadata?.code || '';
-
           await gql(updateUserSubscriptionMutation, {
             input: {
               id: dbSub.id,
               state: subscription.status,
               planId: priceItem.price.id,
-              planName: productName,
-              planCode: productCode,
+              planName: product.name || '',
+              planCode: product.metadata?.code || '',
               currentPeriodStart: priceItem.current_period_start,
               currentPeriodEnd: priceItem.current_period_end,
               trialStart: subscription.trial_start,
