@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
 import { Footer } from 'shared/layout';
 import { generateClient } from 'aws-amplify/api';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 const createContactMutation = /* GraphQL */ `
   mutation CreateContact($input: CreateContactInput!) {
@@ -20,6 +23,8 @@ const Contact = () => {
   const [validationError, setValidationError] = useState('');
   const [sendMessageSuccess, setSendMessageSuccess] = useState(false);
   const [sendMessageError, setSendMessageError] = useState(false);
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
+  const turnstileTokenRef = useRef<string | null>(null);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +38,10 @@ const Contact = () => {
     }
     if (!email.includes('@')) {
       setValidationError('Please enter a valid email address');
+      return;
+    }
+    if (!turnstileTokenRef.current) {
+      setValidationError('Please complete the security check');
       return;
     }
 
@@ -55,6 +64,8 @@ const Contact = () => {
       setEmail('');
       setMessage('');
       setPhone('');
+      turnstileTokenRef.current = null;
+      turnstileRef.current?.reset();
     } catch (error) {
       setSendMessageError(true);
       console.log(error);
@@ -128,6 +139,19 @@ const Contact = () => {
                 rows={5}
                 className="w-full border border-gray-300 rounded-md p-2"
                 placeholder="Your message"
+              />
+            </div>
+            <div className="flex justify-center">
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={TURNSTILE_SITE_KEY}
+                onSuccess={(token) => {
+                  turnstileTokenRef.current = token;
+                }}
+                onExpire={() => {
+                  turnstileTokenRef.current = null;
+                  turnstileRef.current?.reset();
+                }}
               />
             </div>
             <button
