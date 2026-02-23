@@ -36,7 +36,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       },
       success_url: `${process.env.CHECKOUT_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: process.env.CHECKOUT_CANCEL_URL,
-      metadata: { userId },
+      metadata: { userId, companyName },
     });
 
     return {
