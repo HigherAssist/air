@@ -130,8 +130,14 @@ const useAuth = create<AuthStore>((set) => ({
       if (!dbUser) {
         set({ sessionRevoked: true });
       }
-    } catch {
-      // Cognito session expired naturally — normal auth flow handles this
+    } catch (error: any) {
+      // When AdminDeleteUser removes the Cognito account, fetchUserAttributes()
+      // throws UserNotFoundException — that means the user was deleted → show modal
+      const name = error?.name || error?.code || '';
+      if (name === 'UserNotFoundException') {
+        set({ sessionRevoked: true });
+      }
+      // All other errors (network, normal token expiry) — let auth flow handle it
     }
   },
 }));

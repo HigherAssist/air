@@ -318,7 +318,7 @@ deleteAdminUserLambda.addToRolePolicy(
 );
 deleteAdminUserLambda.addToRolePolicy(
   new iam.PolicyStatement({
-    actions: ['cognito-idp:AdminDeleteUser'],
+    actions: ['cognito-idp:AdminDeleteUser', 'cognito-idp:AdminUserGlobalSignOut'],
     resources: [`arn:aws:cognito-idp:${dataStack.region}:${dataStack.account}:userpool/*`],
   })
 );
