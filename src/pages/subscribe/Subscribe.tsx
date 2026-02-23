@@ -78,8 +78,8 @@ const Subscribe = () => {
             Choose Your Plan
           </h1>
           <p className="text-center text-gray-600 mb-12">
-            All plans include a 14-day free trial. No credit card required to
-            start.
+            All plans include a 14-day free trial. Your credit card will not be
+            charged until the trial ends.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
