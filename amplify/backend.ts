@@ -16,6 +16,7 @@ import { stripeWebhook } from './functions/stripe-webhook/resource';
 import { stripeGetPlans } from './functions/stripe-get-plans/resource';
 import { stripeGetSubscriptions } from './functions/stripe-get-subscriptions/resource';
 import { stripeCustomerPortal } from './functions/stripe-customer-portal/resource';
+import { stripeUpdateSubscription } from './functions/stripe-update-subscription/resource';
 import { contactFormTrigger } from './functions/contact-form-trigger/resource';
 import { sendEmailPlanQuery } from './functions/send-email-plan-query/resource';
 
@@ -36,6 +37,7 @@ const backend = defineBackend({
   stripeGetPlans,
   stripeGetSubscriptions,
   stripeCustomerPortal,
+  stripeUpdateSubscription,
   contactFormTrigger,
   sendEmailPlanQuery,
 });
@@ -167,6 +169,14 @@ subscriptionResource.addResource('portal').addMethod(
   'POST',
   new apigateway.LambdaIntegration(
     backend.stripeCustomerPortal.resources.lambda
+  ),
+  authOptions
+);
+
+subscriptionResource.addResource('update').addMethod(
+  'POST',
+  new apigateway.LambdaIntegration(
+    backend.stripeUpdateSubscription.resources.lambda
   ),
   authOptions
 );

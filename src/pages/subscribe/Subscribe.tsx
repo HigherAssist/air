@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, usePlans } from 'shared/hooks';
 import { PaymentService } from 'shared/services';
 import { Spinner } from 'shared/components';
@@ -16,8 +16,18 @@ import toast from 'react-hot-toast';
 import { Modal } from 'antd';
 import { AiOutlineCheck, AiOutlineClose, AiOutlineInfoCircle } from 'react-icons/ai';
 
+type UpdateState = {
+  isUpdate: true;
+  currentPriceId: string;
+  subscriptionId: string;
+};
+
 const Subscribe = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const updateState = location.state as UpdateState | null;
+  const isUpdate = updateState?.isUpdate === true;
+
   const { dbUser } = useAuth();
   const { plans, isLoading, getPlans } = usePlans();
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
@@ -29,6 +39,23 @@ const Subscribe = () => {
   }, [getPlans]);
 
   const handleStartNow = (plan: Plan) => async () => {
+    if (isUpdate) {
+      try {
+        setCheckoutLoading(true);
+        await PaymentService.updateSubscription({
+          subscriptionId: updateState!.subscriptionId,
+          newPriceId: plan.priceId,
+        });
+        toast.success('Subscription updated successfully!');
+        navigate('/account');
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to update subscription. Please try again.');
+        setCheckoutLoading(false);
+      }
+      return;
+    }
+
     try {
       setCheckoutLoading(true);
       const user = dbUser as User;
@@ -75,12 +102,19 @@ const Subscribe = () => {
       <section className="py-16">
         <div className="container mx-auto px-4">
           <h1 className="text-3xl font-bold text-center mb-4">
-            Choose Your Plan
+            {isUpdate ? 'Change Your Plan' : 'Choose Your Plan'}
           </h1>
-          <p className="text-center text-gray-600 mb-12">
-            All plans include a 14-day free trial. Your credit card will not be
-            charged until the trial ends.
-          </p>
+          {!isUpdate && (
+            <p className="text-center text-gray-600 mb-12">
+              All plans include a 14-day free trial. Your credit card will not be
+              charged until the trial ends.
+            </p>
+          )}
+          {isUpdate && (
+            <p className="text-center text-gray-600 mb-12">
+              Select a new plan below. The price difference will be prorated immediately.
+            </p>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {plans.map((plan, planIndex) => {
@@ -90,22 +124,32 @@ const Subscribe = () => {
                 ] || '$';
               const price = (plan.unitAmount / 100).toFixed(2);
 
+              const isCurrentPlan = isUpdate && plan.priceId === updateState?.currentPriceId;
+
               return (
                 <div
                   key={plan.id}
                   className={`bg-white rounded-lg shadow-md p-6 border ${
-                    planIndex === 1
+                    isCurrentPlan
+                      ? 'border-gray-400 ring-2 ring-gray-400'
+                      : planIndex === 1
                       ? 'border-BlueLagoon ring-2 ring-BlueLagoon'
                       : 'border-gray-200'
                   }`}
                 >
-                  {planIndex === 1 && (
+                  {isCurrentPlan ? (
+                    <div className="text-center mb-2">
+                      <span className="bg-gray-500 text-white text-xs px-3 py-1 rounded-full">
+                        Current Plan
+                      </span>
+                    </div>
+                  ) : planIndex === 1 && !isUpdate ? (
                     <div className="text-center mb-2">
                       <span className="bg-BlueLagoon text-white text-xs px-3 py-1 rounded-full">
                         Most Popular
                       </span>
                     </div>
-                  )}
+                  ) : null}
                   <h3 className="text-xl font-bold text-center mb-2">
                     {plan.name}
                   </h3>
@@ -157,11 +201,17 @@ const Subscribe = () => {
                   </ul>
 
                   <button
-                    onClick={handleStartNow(plan)}
-                    disabled={checkoutLoading}
+                    onClick={isCurrentPlan ? undefined : handleStartNow(plan)}
+                    disabled={checkoutLoading || isCurrentPlan}
                     className="w-full bg-BlueLagoon text-white py-2 rounded-md hover:opacity-90 disabled:opacity-50 mb-2"
                   >
-                    {checkoutLoading ? 'Loading...' : 'Start Now'}
+                    {checkoutLoading && !isCurrentPlan
+                      ? 'Loading...'
+                      : isCurrentPlan
+                      ? 'Current Plan'
+                      : isUpdate
+                      ? 'Switch to This Plan'
+                      : 'Start Now'}
                   </button>
                   <button
                     onClick={() => handleViewDetails(plan)}

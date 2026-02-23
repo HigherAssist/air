@@ -68,6 +68,17 @@ export class PaymentService {
     return response.json();
   }
 
+  public static async updateSubscription(payload: {
+    subscriptionId: string;
+    newPriceId: string;
+  }): Promise<{ subscriptionId: string; status: string }> {
+    const response = await authFetch('subscription/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return response.json();
+  }
+
   public static async sendPlanInquiry(payload: {
     email: string;
     firstName: string;

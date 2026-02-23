@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth, useSubscriptions } from 'shared/hooks';
 import { PaymentService, UserService } from 'shared/services';
 import { WithSubscription } from 'shared/components';
@@ -21,6 +22,7 @@ import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 
 const Account = () => {
+  const navigate = useNavigate();
   const { dbUser, refreshUser } = useAuth();
   const { subscriptions, customer, setSubscriptions, setCustomer } = useSubscriptions();
   const [users, setUsers] = useState<User[]>([]);
@@ -287,6 +289,21 @@ const Account = () => {
             <Button type="primary" onClick={handleManageBilling}>
               Manage Billing
             </Button>
+            {activeSubscription && (
+              <Button
+                onClick={() =>
+                  navigate('/subscribe', {
+                    state: {
+                      isUpdate: true,
+                      currentPriceId: activeSubscription.plan.id,
+                      subscriptionId: activeSubscription.id,
+                    },
+                  })
+                }
+              >
+                Update Subscription
+              </Button>
+            )}
           </div>
         )}
       </div>
