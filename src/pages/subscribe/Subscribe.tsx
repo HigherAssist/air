@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth, usePlans } from 'shared/hooks';
 import { PaymentService } from 'shared/services';
 import { Spinner } from 'shared/components';
@@ -16,6 +17,7 @@ import { Modal } from 'antd';
 import { AiOutlineCheck, AiOutlineClose, AiOutlineInfoCircle } from 'react-icons/ai';
 
 const Subscribe = () => {
+  const navigate = useNavigate();
   const { dbUser } = useAuth();
   const { plans, isLoading, getPlans } = usePlans();
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
@@ -47,22 +49,16 @@ const Subscribe = () => {
     }
   };
 
-  const handleHaveQuestions = async () => {
-    try {
-      const user = dbUser as User;
-      await PaymentService.sendPlanInquiry({
+  const handleHaveQuestions = () => {
+    const user = dbUser as User;
+    navigate('/contact', {
+      state: {
+        name: `${user.firstName} ${user.lastName}`.trim(),
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        companyName: user.companyName,
-      });
-      toast.success(
-        'Your inquiry has been sent. Our team will reach out to you shortly.'
-      );
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to send inquiry. Please try again.');
-    }
+        phone: user.phoneNumber || '',
+        message: 'I have a question about Sales.',
+      },
+    });
   };
 
   const handleViewDetails = (plan: Plan) => {

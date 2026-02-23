@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Footer } from 'shared/layout';
 import { generateClient } from 'aws-amplify/api';
 
@@ -11,10 +12,11 @@ const createContactMutation = /* GraphQL */ `
 `;
 
 const Contact = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [message, setMessage] = useState('');
+  const { state } = useLocation();
+  const [name, setName] = useState(state?.name || '');
+  const [email, setEmail] = useState(state?.email || '');
+  const [phone, setPhone] = useState(state?.phone || '');
+  const [message, setMessage] = useState(state?.message || '');
   const [validationError, setValidationError] = useState('');
   const [sendMessageSuccess, setSendMessageSuccess] = useState(false);
   const [sendMessageError, setSendMessageError] = useState(false);
