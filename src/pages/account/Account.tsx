@@ -139,10 +139,28 @@ const Account = () => {
 
   const handleUpdateATS = async (values: EditATSType) => {
     try {
+      // Update admin's own record
       await UserService.updateDbUser({
         id: dbUser!.id,
         ...values,
       });
+
+      // Propagate ATS config to all team members on the same subscription
+      const teamMembers = users.filter(u => u.id !== dbUser!.id);
+      if (teamMembers.length > 0) {
+        await Promise.all(
+          teamMembers.map(u =>
+            UserService.updateDbUser({
+              id: u.id,
+              atsname: values.atsname,
+              apikeytype: values.apikeytype,
+              apikey1: values.apikey1,
+              apikey2: values.apikey2,
+            })
+          )
+        );
+      }
+
       await refreshUser();
       toast.success('ATS configuration updated!');
       setIsATSModalOpen(false);
