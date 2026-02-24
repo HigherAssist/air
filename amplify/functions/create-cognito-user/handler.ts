@@ -131,13 +131,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         });
         const item = subscription.items.data[0];
         if (item) {
-          await stripe.subscriptions.update(adminUser.subscriptionId, {
-            items: [{ id: item.id, quantity: (item.quantity || 1) + 1 }],
+          const currentQty = item.quantity || 1;
+          const newQty = currentQty + 1;
+          console.log(`Stripe seat +1: sub=${adminUser.subscriptionId} item=${item.id} qty ${currentQty} → ${newQty}`);
+          const updated = await stripe.subscriptions.update(adminUser.subscriptionId, {
+            items: [{ id: item.id, quantity: newQty }],
           });
+          console.log(`Stripe seat +1 success: status=${updated.status} qty=${updated.items.data[0]?.quantity}`);
+        } else {
+          console.warn('Stripe seat +1 skipped: no item found on subscription');
         }
       } catch (stripeError) {
-        console.error('Stripe seat update failed (non-fatal):', stripeError);
+        console.error('Stripe seat +1 failed (non-fatal):', stripeError);
       }
+    } else {
+      console.warn('Stripe seat +1 skipped: adminUser has no subscriptionId');
     }
 
     // Send invite email
