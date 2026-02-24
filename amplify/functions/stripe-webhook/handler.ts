@@ -46,6 +46,14 @@ const updateUserSubscriptionMutation = /* GraphQL */ `
   }
 `;
 
+const getUserSubscriptionBySubscriptionIdForCardQuery = /* GraphQL */ `
+  query GetUserSubscriptionBySubscriptionId($subscriptionId: String!) {
+    getUserSubscriptionBySubscriptionId(subscriptionId: $subscriptionId) {
+      items { id subscriptionId }
+    }
+  }
+`;
+
 const getUserSubscriptionBySubscriptionIdQuery = /* GraphQL */ `
   query GetUserSubscriptionBySubscriptionId($subscriptionId: String!) {
     getUserSubscriptionBySubscriptionId(subscriptionId: $subscriptionId) {
@@ -81,10 +89,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const subscription = await stripe.subscriptions.retrieve(
           subscriptionId,
-          { expand: ['items.data.price.product'] }
+          { expand: ['items.data.price.product', 'default_payment_method'] }
         );
         const priceItem = subscription.items.data[0];
         const product = priceItem.price.product as Stripe.Product;
+        const dpm = subscription.default_payment_method as Stripe.PaymentMethod | null;
+        const checkoutCard = dpm?.type === 'card' ? dpm.card : null;
 
         const customerEmail =
           session.customer_details?.email || session.customer_email || '';
@@ -105,6 +115,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             trialEnd: subscription.trial_end,
             canceledAt: null,
             quantity: priceItem.quantity || 1,
+            cardExpMonth: checkoutCard?.exp_month ?? null,
+            cardExpYear: checkoutCard?.exp_year ?? null,
           },
         });
 
@@ -140,12 +152,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       case 'customer.subscription.updated': {
         const rawSub = stripeEvent.data.object as Stripe.Subscription;
 
-        // Retrieve with expansion so product name/code are available
+        // Retrieve with expansion so product name/code and card expiry are available
         const subscription = await stripe.subscriptions.retrieve(rawSub.id, {
-          expand: ['items.data.price.product'],
+          expand: ['items.data.price.product', 'default_payment_method'],
         });
         const priceItem = subscription.items.data[0];
         const product = priceItem.price.product as Stripe.Product;
+        const updatedDpm = subscription.default_payment_method as Stripe.PaymentMethod | null;
+        const updatedCard = updatedDpm?.type === 'card' ? updatedDpm.card : null;
 
         const result: any = await gql(getUserSubscriptionBySubscriptionIdQuery, {
           subscriptionId: subscription.id,
@@ -166,6 +180,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
               trialEnd: subscription.trial_end,
               canceledAt: subscription.canceled_at,
               quantity: priceItem.quantity || 1,
+              cardExpMonth: updatedCard?.exp_month ?? null,
+              cardExpYear: updatedCard?.exp_year ?? null,
             },
           });
         }
@@ -187,6 +203,46 @@ export const handler: APIGatewayProxyHandler = async (event) => {
               state: 'canceled',
               canceledAt:
                 subscription.canceled_at || Math.floor(Date.now() / 1000),
+            },
+          });
+        }
+        break;
+      }
+
+      case 'payment_method.updated': {
+        // Fires when a card is automatically renewed by the card network (same PM id, new expiry).
+        const pm = stripeEvent.data.object as Stripe.PaymentMethod;
+        if (pm.type !== 'card' || !pm.customer) break;
+
+        const customerId = typeof pm.customer === 'string' ? pm.customer : pm.customer.id;
+        const card = pm.card;
+        if (!card) break;
+
+        // Find the active subscription for this customer that uses this payment method
+        const subs = await stripe.subscriptions.list({ customer: customerId, limit: 10 });
+        const matchingSub = subs.data.find((s) => {
+          const subDpm = s.default_payment_method;
+          const subDpmId = typeof subDpm === 'string' ? subDpm : subDpm?.id;
+          return subDpmId === pm.id;
+        });
+
+        if (!matchingSub) {
+          console.log(`payment_method.updated: no subscription found using pm ${pm.id} for customer ${customerId}`);
+          break;
+        }
+
+        const pmResult: any = await gql(getUserSubscriptionBySubscriptionIdForCardQuery, {
+          subscriptionId: matchingSub.id,
+        });
+        const pmDbSub = pmResult.getUserSubscriptionBySubscriptionId.items[0];
+
+        if (pmDbSub) {
+          console.log(`payment_method.updated: updating card expiry for sub ${matchingSub.id} → ${card.exp_month}/${card.exp_year}`);
+          await gql(updateUserSubscriptionMutation, {
+            input: {
+              id: pmDbSub.id,
+              cardExpMonth: card.exp_month,
+              cardExpYear: card.exp_year,
             },
           });
         }

@@ -20,11 +20,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       };
     }
 
-    // List subscriptions expanding only to price (4 levels max: data.items.data.price).
-    // Expanding further to data.items.data.price.product (5 levels) exceeds Stripe's limit.
+    // List subscriptions expanding to price and default_payment_method.
+    // 4-level expand limit: data.items.data.price and data.default_payment_method are both within limit.
     const subscriptionList = await stripe.subscriptions.list({
       customer: stripeCustomerId,
-      expand: ['data.items.data.price'],
+      expand: ['data.items.data.price', 'data.default_payment_method'],
     });
 
     // Fetch each product separately now that we have the price object
@@ -33,6 +33,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const priceItem = sub.items.data[0];
         const productId = priceItem.price.product as string;
         const product = await stripe.products.retrieve(productId);
+
+        // Extract card expiry from default_payment_method
+        const dpm = sub.default_payment_method as Stripe.PaymentMethod | null;
+        const card = dpm?.type === 'card' ? dpm.card : null;
+
         return {
           id: sub.id,
           status: sub.status,
@@ -47,6 +52,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             code: product.metadata?.code || '',
           },
           quantity: priceItem.quantity || 1,
+          cardExpMonth: card?.exp_month ?? null,
+          cardExpYear: card?.exp_year ?? null,
         };
       })
     );

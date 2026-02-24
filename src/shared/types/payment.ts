@@ -12,6 +12,8 @@ export type StripeSubscription = {
     code: string;
   };
   quantity: number;
+  cardExpMonth: number | null;
+  cardExpYear: number | null;
 };
 
 export type StripeCustomer = {

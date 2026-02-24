@@ -13,7 +13,7 @@ const getUserSubscriptionBySubscriptionIdQuery = /* GraphQL */ `
         planId planName planCode
         currentPeriodStart currentPeriodEnd
         trialStart trialEnd canceledAt
-        quantity
+        quantity cardExpMonth cardExpYear
       }
     }
   }
@@ -74,6 +74,8 @@ const WithSubscription = <P extends object>(
                 trialEnd: activeSub.trialEnd || null,
                 canceledAt: activeSub.canceledAt || null,
                 quantity: activeSub.quantity || 1,
+                cardExpMonth: activeSub.cardExpMonth ?? null,
+                cardExpYear: activeSub.cardExpYear ?? null,
               }]);
               setLoading(false);
               return;

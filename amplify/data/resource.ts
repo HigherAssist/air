@@ -54,6 +54,8 @@ const schema = a.schema({
       trialEnd: a.timestamp(),
       canceledAt: a.timestamp(),
       quantity: a.integer().required(),
+      cardExpMonth: a.integer(),
+      cardExpYear: a.integer(),
     })
     .secondaryIndexes((index) => [
       index('subscriptionId')

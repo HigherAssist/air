@@ -279,6 +279,28 @@ const Account = () => {
               <strong>Subscription ID:</strong>{' '}
               <span className="font-mono text-sm text-gray-600">{activeSubscription.id}</span>
             </p>
+            {activeSubscription.cardExpMonth && activeSubscription.cardExpYear && (() => {
+              const now = new Date();
+              const expYear = activeSubscription.cardExpYear!;
+              const expMonth = activeSubscription.cardExpMonth!;
+              const expired =
+                expYear < now.getFullYear() ||
+                (expYear === now.getFullYear() && expMonth < now.getMonth() + 1);
+              const daysUntilExpiry = Math.floor(
+                (new Date(expYear, expMonth, 0).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+              );
+              const expiringSoon = !expired && daysUntilExpiry <= 60;
+              const color = expired ? 'text-red-600' : expiringSoon ? 'text-amber-600' : 'text-gray-900';
+              const label = expired ? ' (Expired)' : expiringSoon ? ' (Expiring soon)' : '';
+              return (
+                <p>
+                  <strong>Payment Expiration:</strong>{' '}
+                  <span className={color}>
+                    {String(expMonth).padStart(2, '0')}/{expYear}{label}
+                  </span>
+                </p>
+              );
+            })()}
           </div>
         ) : (
           <p className="text-gray-500">No active subscription found.</p>
