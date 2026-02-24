@@ -35,16 +35,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       };
     }
 
-    // Update the subscription with the new price, prorating the difference
+    // Preserve current seat count when switching plans
+    const currentQty = subscriptionItem.quantity || 1;
+    console.log(`Plan update: sub=${subscriptionId} item=${subscriptionItem.id} price=${newPriceId} qty=${currentQty}`);
+
+    // Update the subscription with the new price, preserving quantity and prorating the difference
     const updated = await stripe.subscriptions.update(subscriptionId, {
       items: [
         {
           id: subscriptionItem.id,
           price: newPriceId,
+          quantity: currentQty,
         },
       ],
       proration_behavior: 'create_prorations',
     });
+
+    console.log(`Plan update success: status=${updated.status} qty=${updated.items.data[0]?.quantity}`);
 
     return {
       statusCode: 200,
