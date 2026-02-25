@@ -33,10 +33,44 @@ const Subscribe = () => {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
 
   useEffect(() => {
     getPlans();
   }, [getPlans]);
+
+  useEffect(() => {
+    if (!dbUser) return;
+
+    // Update mode: no check needed
+    if (isUpdate) {
+      setSubscriptionChecked(true);
+      return;
+    }
+
+    // Admin with a Stripe customer: check for an existing active/trialing subscription
+    // and redirect to /account if found, to prevent accidental double subscriptions
+    if (dbUser.stripeCustomerId) {
+      PaymentService.getUserSubscriptions(dbUser.stripeCustomerId)
+        .then(({ subscriptions }) => {
+          const hasActive = subscriptions.some(
+            (s) => s.status === 'active' || s.status === 'trialing'
+          );
+          if (hasActive) {
+            navigate('/account');
+          } else {
+            setSubscriptionChecked(true);
+          }
+        })
+        .catch(() => {
+          // If the check fails, allow through — the server guard will catch any issues
+          setSubscriptionChecked(true);
+        });
+    } else {
+      // Invited user or new admin without stripeCustomerId — allow through
+      setSubscriptionChecked(true);
+    }
+  }, [dbUser, isUpdate, navigate]);
 
   const handleStartNow = (plan: Plan) => async () => {
     if (isUpdate) {
@@ -93,7 +127,7 @@ const Subscribe = () => {
     setIsModalOpen(true);
   };
 
-  if (isLoading) {
+  if (isLoading || !subscriptionChecked) {
     return <Spinner />;
   }
 

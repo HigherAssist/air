@@ -24,6 +24,27 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       });
     }
 
+    // Guard: prevent creating a second subscription if one already exists
+    const existingSubscriptions = await stripe.subscriptions.list({
+      customer: customer.id,
+      limit: 10,
+    });
+    const hasActive = existingSubscriptions.data.some(
+      (sub) => sub.status === 'active' || sub.status === 'trialing'
+    );
+    if (hasActive) {
+      return {
+        statusCode: 409,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': '*',
+        },
+        body: JSON.stringify({
+          error: 'You already have an active subscription. To change your plan, use Update Subscription from your account page.',
+        }),
+      };
+    }
+
     // Create Stripe Checkout Session using /v1/subscriptions flow
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
