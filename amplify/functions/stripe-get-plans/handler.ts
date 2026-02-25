@@ -3,20 +3,28 @@ import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+const LOOKUP_KEY_ORDER = [
+  'starter_monthly',
+  'professional_monthly',
+  'enterprise_monthly',
+];
+
 export const handler: APIGatewayProxyHandler = async () => {
   try {
-    // Get the configured price IDs for this environment
-    const priceIds = [
-      process.env.STRIPE_PRICE_STARTER,
-      process.env.STRIPE_PRICE_PROFESSIONAL,
-      process.env.STRIPE_PRICE_ENTERPRISE,
-    ].filter(Boolean) as string[];
+    const priceList = await stripe.prices.list({
+      lookup_keys: LOOKUP_KEY_ORDER,
+      expand: ['data.product'],
+    });
 
-    const plans = await Promise.all(
-      priceIds.map(async (priceId) => {
-        const price = await stripe.prices.retrieve(priceId, {
-          expand: ['product'],
-        });
+    // Sort results to match the desired Starter → Professional → Enterprise display order
+    const priceMap = new Map(
+      priceList.data.map((price) => [price.lookup_key, price])
+    );
+
+    const plans = LOOKUP_KEY_ORDER
+      .map((key) => {
+        const price = priceMap.get(key);
+        if (!price) return null;
         const product = price.product as Stripe.Product;
         return {
           id: product.id,
@@ -31,7 +39,7 @@ export const handler: APIGatewayProxyHandler = async () => {
           state: product.active ? 'active' : 'inactive',
         };
       })
-    );
+      .filter(Boolean);
 
     return {
       statusCode: 200,
