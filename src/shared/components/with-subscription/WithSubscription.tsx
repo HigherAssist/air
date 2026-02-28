@@ -131,18 +131,27 @@ const WithSubscription = <P extends object>(
     }
 
     if (showCancelModal) {
+      const isAdmin = !!dbUser?.stripeCustomerId;
       return (
         <Modal
           open={true}
           title="Subscription Cancelled"
           closable={false}
           footer={[
-            <Button key="ok" type="primary" onClick={handleSignOut}>
-              OK
+            isAdmin ? (
+              <Button key="resubscribe" type="primary" onClick={() => navigate('/subscribe')}>
+                Re-subscribe
+              </Button>
+            ) : null,
+            <Button key="signout" onClick={handleSignOut}>
+              Sign Out
             </Button>,
           ]}
         >
           <p>Your HireAssist AIR subscription has been cancelled.</p>
+          {isAdmin && (
+            <p>Click <strong>Re-subscribe</strong> to choose a new plan and restore access for your team.</p>
+          )}
         </Modal>
       );
     }
