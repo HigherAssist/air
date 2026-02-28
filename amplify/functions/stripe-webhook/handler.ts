@@ -6,7 +6,7 @@ import {
   AdminUserGlobalSignOutCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -265,8 +265,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
           const usersToSignOut = scanResult.Items || [];
           console.log(`Subscription canceled: signing out ${usersToSignOut.length} user(s) for sub ${subscription.id}`);
 
+          const now = new Date().toISOString();
           for (const user of usersToSignOut) {
             if (user.email) {
+              // Force global sign-out (invalidates refresh tokens)
               try {
                 await cognitoClient.send(
                   new AdminUserGlobalSignOutCommand({
@@ -278,6 +280,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
               } catch (signOutError) {
                 console.warn(`Global sign-out failed for ${user.email} (non-fatal):`, signOutError);
               }
+            }
+
+            // Mark user as Inactive in DynamoDB
+            try {
+              await ddb.send(
+                new UpdateCommand({
+                  TableName: TABLE_NAME,
+                  Key: { id: user.id },
+                  UpdateExpression: 'SET #status = :inactive, updatedAt = :now',
+                  ExpressionAttributeNames: { '#status': 'status' },
+                  ExpressionAttributeValues: { ':inactive': 'Inactive', ':now': now },
+                })
+              );
+            } catch (updateError) {
+              console.warn(`Failed to set Inactive for user ${user.id} (non-fatal):`, updateError);
             }
           }
 

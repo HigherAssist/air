@@ -288,7 +288,7 @@ webhookLambda.addToRolePolicy(
 );
 webhookLambda.addToRolePolicy(
   new iam.PolicyStatement({
-    actions: ['dynamodb:GetItem', 'dynamodb:Scan'],
+    actions: ['dynamodb:GetItem', 'dynamodb:Scan', 'dynamodb:UpdateItem'],
     resources: [`arn:aws:dynamodb:${dataStack.region}:${dataStack.account}:table/*`],
   })
 );
