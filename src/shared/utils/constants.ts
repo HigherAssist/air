@@ -37,7 +37,7 @@ export const pricingPlanCheckListItemsDescription = [
 const startPlanCheckListItems = [
   ...pricingPlanCheckListItems.slice(0, 5),
   ...Array(3).fill('#'),
-  pricingPlanCheckListItems.slice(8, 9),
+  ...pricingPlanCheckListItems.slice(8, 9),
 ];
 const professionalPlanCheckListItems = [
   ...Array(5).fill('repeat'),
