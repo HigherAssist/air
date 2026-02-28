@@ -333,6 +333,23 @@ deleteAdminUserLambda.addToRolePolicy(
   })
 );
 
+// ============================================================
+// Grant stripeUpdateSubscription Lambda SES permissions + app origin
+// ============================================================
+const stripeUpdateSubscriptionLambda = backend.stripeUpdateSubscription.resources.lambda as lambda.Function;
+stripeUpdateSubscriptionLambda.addEnvironment(
+  'AMPLIFY_APP_ORIGIN',
+  envLabel === 'sandbox'
+    ? 'http://localhost:5173'
+    : `https://${envLabel}.d3carnh06cjb9r.amplifyapp.com`
+);
+stripeUpdateSubscriptionLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    resources: ['*'],
+  })
+);
+
 // Output the API URL so the frontend can use it
 backend.addOutput({
   custom: {
