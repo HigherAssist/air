@@ -25,8 +25,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     // Extract admin info from Cognito JWT claims (injected by API Gateway authorizer)
     const claims = (event.requestContext.authorizer as any)?.claims || {};
-    const firstName = claims.given_name || '';
-    const lastName = claims.family_name || '';
+    const firstName = claims['custom:first_name'] || '';
+    const lastName = claims['custom:last_name'] || '';
     const adminEmail = claims.email || '';
 
     // Retrieve the current subscription to get the subscription item ID and quantity
