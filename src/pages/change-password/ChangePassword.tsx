@@ -2,7 +2,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Input } from '@aws-amplify/ui-react';
 import { updatePassword, signOut } from 'aws-amplify/auth';
-import { ErrorMessage } from 'shared/components';
+import { ErrorMessage, WithSubscription } from 'shared/components';
 import { isError, isErrorMessage } from 'shared/utils';
 import {
   changePasswordSchema,
@@ -102,4 +102,4 @@ const ChangePassword = () => {
   );
 };
 
-export default ChangePassword;
+export default WithSubscription(ChangePassword);

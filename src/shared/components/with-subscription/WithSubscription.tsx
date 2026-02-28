@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Modal, Button } from 'antd';
+import { signOut } from 'aws-amplify/auth';
 import { useAuth, useSubscriptions } from 'shared/hooks';
 import { PaymentService } from 'shared/services';
 import { execute } from 'shared/utils';
@@ -27,6 +29,7 @@ const WithSubscription = <P extends object>(
     const { dbUser } = useAuth();
     const { setSubscriptions, setCustomer } = useSubscriptions();
     const [loading, setLoading] = useState(true);
+    const [showCancelModal, setShowCancelModal] = useState(false);
 
     useEffect(() => {
       const fetchSubscriptions = async () => {
@@ -37,6 +40,23 @@ const WithSubscription = <P extends object>(
               await PaymentService.getUserSubscriptions(dbUser.stripeCustomerId);
 
             if (!subscriptions || subscriptions.length === 0) {
+              // Check if this is a cancellation (vs. a new user who hasn't subscribed yet)
+              if (dbUser.subscriptionId) {
+                const result = await execute(
+                  {
+                    statement: getUserSubscriptionBySubscriptionIdQuery,
+                    name: 'getUserSubscriptionBySubscriptionId',
+                  },
+                  { subscriptionId: dbUser.subscriptionId }
+                );
+                const items = result.items as any[];
+                const canceledSub = items?.find((s: any) => s.state === 'canceled');
+                if (canceledSub) {
+                  setLoading(false);
+                  setShowCancelModal(true);
+                  return;
+                }
+              }
               navigate('/subscribe');
               return;
             }
@@ -59,6 +79,8 @@ const WithSubscription = <P extends object>(
             const activeSub = subRecords?.find(
               (s: any) => s.state === 'active' || s.state === 'trialing'
             );
+            const canceledSub = subRecords?.find((s: any) => s.state === 'canceled');
+
             if (activeSub) {
               setSubscriptions([{
                 id: activeSub.subscriptionId,
@@ -80,6 +102,12 @@ const WithSubscription = <P extends object>(
               setLoading(false);
               return;
             }
+
+            if (canceledSub) {
+              setLoading(false);
+              setShowCancelModal(true);
+              return;
+            }
           }
 
           navigate('/subscribe');
@@ -94,8 +122,29 @@ const WithSubscription = <P extends object>(
       }
     }, [dbUser, navigate, setSubscriptions, setCustomer]);
 
+    const handleSignOut = async () => {
+      await signOut();
+    };
+
     if (loading) {
       return <Spinner />;
+    }
+
+    if (showCancelModal) {
+      return (
+        <Modal
+          open={true}
+          title="Subscription Cancelled"
+          closable={false}
+          footer={[
+            <Button key="ok" type="primary" onClick={handleSignOut}>
+              OK
+            </Button>,
+          ]}
+        >
+          <p>Your HireAssist AIR subscription has been cancelled.</p>
+        </Modal>
+      );
     }
 
     return <WrappedComponent {...props} />;

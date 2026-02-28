@@ -263,10 +263,39 @@ const webhookLambda = backend.stripeWebhook.resources.lambda as lambda.Function;
 const cfnResources = backend.data.resources.cfnResources as any;
 webhookLambda.addEnvironment('AMPLIFY_DATA_GRAPHQL_ENDPOINT', cfnResources.cfnGraphqlApi.attrGraphQlUrl);
 webhookLambda.addEnvironment('AMPLIFY_DATA_API_KEY', cfnResources.cfnApiKey?.attrApiKey ?? '');
+webhookLambda.addEnvironment('USER_TABLE_SSM_PARAM', ssmParamName);
+webhookLambda.addEnvironment('USER_POOL_ID_SSM_PARAM', ssmUserPoolIdParamName);
+webhookLambda.addEnvironment(
+  'AMPLIFY_APP_ORIGIN',
+  envLabel === 'sandbox'
+    ? 'http://localhost:5173'
+    : `https://${envLabel}.d3carnh06cjb9r.amplifyapp.com`
+);
 webhookLambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ['ses:SendEmail', 'ses:SendRawEmail'],
     resources: ['*'],
+  })
+);
+webhookLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['ssm:GetParameter'],
+    resources: [
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-table-name`,
+      `arn:aws:ssm:${dataStack.region}:${dataStack.account}:parameter/air/*/user-pool-id`,
+    ],
+  })
+);
+webhookLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['dynamodb:GetItem', 'dynamodb:Scan'],
+    resources: [`arn:aws:dynamodb:${dataStack.region}:${dataStack.account}:table/*`],
+  })
+);
+webhookLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ['cognito-idp:AdminUserGlobalSignOut'],
+    resources: [`arn:aws:cognito-idp:${dataStack.region}:${dataStack.account}:userpool/*`],
   })
 );
 

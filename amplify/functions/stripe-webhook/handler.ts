@@ -1,9 +1,19 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 import Stripe from 'stripe';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import {
+  CognitoIdentityProviderClient,
+  AdminUserGlobalSignOutCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const sesClient = new SESClient({});
+const cognitoClient = new CognitoIdentityProviderClient({});
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ssmClient = new SSMClient({});
 
 const GRAPHQL_ENDPOINT = process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT!;
 const API_KEY = process.env.AMPLIFY_DATA_API_KEY!;
@@ -20,6 +30,27 @@ async function gql(query: string, variables: Record<string, unknown>) {
   const json: any = await res.json();
   if (json.errors?.length) throw new Error(json.errors[0].message);
   return json.data;
+}
+
+// Lazy-cached SSM lookups (same pattern as create-cognito-user / delete-admin-user)
+let _tableName: string | undefined;
+async function getTableName(): Promise<string> {
+  if (_tableName) return _tableName;
+  const param = await ssmClient.send(
+    new GetParameterCommand({ Name: process.env.USER_TABLE_SSM_PARAM! })
+  );
+  _tableName = param.Parameter!.Value!;
+  return _tableName;
+}
+
+let _userPoolId: string | undefined;
+async function getUserPoolId(): Promise<string> {
+  if (_userPoolId) return _userPoolId;
+  const param = await ssmClient.send(
+    new GetParameterCommand({ Name: process.env.USER_POOL_ID_SSM_PARAM! })
+  );
+  _userPoolId = param.Parameter!.Value!;
+  return _userPoolId;
 }
 
 const createUserSubscriptionMutation = /* GraphQL */ `
@@ -191,6 +222,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       case 'customer.subscription.deleted': {
         const subscription = stripeEvent.data.object as Stripe.Subscription;
 
+        // 1. Update UserSubscription state to canceled
         const result: any = await gql(getUserSubscriptionBySubscriptionIdQuery, {
           subscriptionId: subscription.id,
         });
@@ -205,6 +237,96 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 subscription.canceled_at || Math.floor(Date.now() / 1000),
             },
           });
+
+          const TABLE_NAME = await getTableName();
+          const USER_POOL_ID = await getUserPoolId();
+
+          // 2. Get admin user details for the email
+          const adminResult = await ddb.send(
+            new GetCommand({
+              TableName: TABLE_NAME,
+              Key: { id: dbSub.userId },
+            })
+          );
+          const adminUser = adminResult.Item;
+          const adminFirstName = adminUser?.firstName || '';
+          const adminLastName = adminUser?.lastName || '';
+          const adminEmail = adminUser?.email || '';
+
+          // 3. Find all users on this subscription and force global sign-out
+          const scanResult = await ddb.send(
+            new ScanCommand({
+              TableName: TABLE_NAME,
+              FilterExpression: 'subscriptionId = :sid',
+              ExpressionAttributeValues: { ':sid': subscription.id },
+              ProjectionExpression: 'id, email',
+            })
+          );
+          const usersToSignOut = scanResult.Items || [];
+          console.log(`Subscription canceled: signing out ${usersToSignOut.length} user(s) for sub ${subscription.id}`);
+
+          for (const user of usersToSignOut) {
+            if (user.email) {
+              try {
+                await cognitoClient.send(
+                  new AdminUserGlobalSignOutCommand({
+                    Username: user.email,
+                    UserPoolId: USER_POOL_ID,
+                  })
+                );
+                console.log(`Global sign-out: ${user.email}`);
+              } catch (signOutError) {
+                console.warn(`Global sign-out failed for ${user.email} (non-fatal):`, signOutError);
+              }
+            }
+          }
+
+          // 4. Send cancellation email to admin and operations
+          const appOrigin = process.env.AMPLIFY_APP_ORIGIN || '';
+          const sesEmail = process.env.SES_EMAIL || '';
+
+          if (sesEmail && adminEmail) {
+            const toAddresses: string[] = [adminEmail];
+            if (sesEmail !== adminEmail) toAddresses.push(sesEmail);
+
+            const htmlBody = `
+<p>Hello,</p>
+<p>
+  ${adminFirstName} ${adminLastName} has cancelled their subscription to the HireAssist AIR team account.<br>
+  We are sorry to see you go, and we really do hope the services have been useful for you.<br>
+  If you want to sign up again, go to this link: <a href="${appOrigin}">${appOrigin}</a>
+</p>
+<p>Best regards,<br>The HireAssist team</p>
+`.trim();
+
+            const textBody = `Hello,
+
+${adminFirstName} ${adminLastName} has cancelled their subscription to the HireAssist AIR team account.
+We are sorry to see you go, and we really do hope the services have been useful for you.
+If you want to sign up again, go to this link: ${appOrigin}
+
+Best regards,
+The HireAssist team`;
+
+            try {
+              await sesClient.send(
+                new SendEmailCommand({
+                  Source: sesEmail,
+                  Destination: { ToAddresses: toAddresses },
+                  Message: {
+                    Subject: { Data: 'You have cancelled your subscription to HireAssist AIR' },
+                    Body: {
+                      Html: { Data: htmlBody },
+                      Text: { Data: textBody },
+                    },
+                  },
+                })
+              );
+              console.log(`Cancellation email sent to: ${toAddresses.join(', ')}`);
+            } catch (emailError: any) {
+              console.error('Failed to send cancellation email:', emailError.message);
+            }
+          }
         }
         break;
       }

@@ -3,6 +3,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Input, PhoneNumberField } from '@aws-amplify/ui-react';
 import { updateUserAttributes } from 'aws-amplify/auth';
+import { WithSubscription } from 'shared/components';
 import useAuth from 'shared/hooks/useAuth';
 import { UserService } from 'shared/services';
 import { ErrorMessage } from 'shared/components';
@@ -153,4 +154,4 @@ const EditProfile = () => {
   );
 };
 
-export default EditProfile;
+export default WithSubscription(EditProfile);
