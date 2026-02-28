@@ -2,10 +2,11 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 import {
   CognitoIdentityProviderClient,
   AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import Stripe from 'stripe';
 import { randomUUID } from 'crypto';
@@ -79,49 +80,130 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const now = new Date().toISOString();
     const companyName = adminUser.companyName || body.companyName;
 
-    // Create Cognito user — inviteToken used as temp password (never shown to user)
-    await cognitoClient.send(
-      new AdminCreateUserCommand({
-        Username: body.username,
-        MessageAction: 'SUPPRESS',
-        UserPoolId: USER_POOL_ID,
-        UserAttributes: [
-          { Name: 'email', Value: body.username },
-          { Name: 'email_verified', Value: 'true' },
-        ],
-        TemporaryPassword: inviteToken,
-        DesiredDeliveryMediums: ['EMAIL'],
-      })
-    );
+    // Create Cognito user — inviteToken used as temp password (never shown to user).
+    // If the user already exists (re-invite after cancellation), reset their temp password instead.
+    let isReinvite = false;
+    try {
+      await cognitoClient.send(
+        new AdminCreateUserCommand({
+          Username: body.username,
+          MessageAction: 'SUPPRESS',
+          UserPoolId: USER_POOL_ID,
+          UserAttributes: [
+            { Name: 'email', Value: body.username },
+            { Name: 'email_verified', Value: 'true' },
+          ],
+          TemporaryPassword: inviteToken,
+          DesiredDeliveryMediums: ['EMAIL'],
+        })
+      );
+    } catch (cognitoError: any) {
+      if (cognitoError.name !== 'UsernameExistsException') throw cognitoError;
+      // User already has a Cognito account — reset to temp password so the invite flow works
+      isReinvite = true;
+      console.log(`Re-inviting existing Cognito user: ${body.username}`);
+      await cognitoClient.send(
+        new AdminSetUserPasswordCommand({
+          Username: body.username,
+          UserPoolId: USER_POOL_ID,
+          Password: inviteToken,
+          Permanent: false, // triggers CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED on sign-in
+        })
+      );
+    }
 
-    // Create DB user record directly in DynamoDB
-    await ddb.send(
-      new PutCommand({
-        TableName: TABLE_NAME,
-        Item: {
-          id: randomUUID(),
-          __typename: 'User',
-          email: body.username,
-          companyName,
-          firstName: '',
-          lastName: '',
-          phoneNumber: '',
-          profileRole: 'User',
-          status: 'Invited',
-          subscriptionId: adminUser.subscriptionId || '',
-          stripeCustomerId: adminUser.stripeCustomerId || '',
-          inviteToken,
-          inviteExpiresAt,
-          invitedBy: body.adminEmail,
-          atsname: adminUser.atsname || '',
-          apikeytype: adminUser.apikeytype || '',
-          apikey1: adminUser.apikey1 || '',
-          apikey2: adminUser.apikey2 || '',
-          createdAt: now,
-          updatedAt: now,
-        },
-      })
-    );
+    if (isReinvite) {
+      // Update the existing DynamoDB record with new invite details and subscription info
+      const existingResult = await ddb.send(
+        new QueryCommand({
+          TableName: TABLE_NAME,
+          IndexName: 'usersByEmailAndCompanyName',
+          KeyConditionExpression: 'email = :email',
+          ExpressionAttributeValues: { ':email': body.username },
+          Limit: 1,
+        })
+      );
+      const existingUser = existingResult.Items?.[0];
+      if (existingUser) {
+        await ddb.send(
+          new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { id: existingUser.id },
+            UpdateExpression:
+              'SET #status = :status, subscriptionId = :subId, stripeCustomerId = :custId, companyName = :co, inviteToken = :token, inviteExpiresAt = :expires, invitedBy = :by, updatedAt = :now',
+            ExpressionAttributeNames: { '#status': 'status' },
+            ExpressionAttributeValues: {
+              ':status': 'Invited',
+              ':subId': adminUser.subscriptionId || '',
+              ':custId': adminUser.stripeCustomerId || '',
+              ':co': companyName,
+              ':token': inviteToken,
+              ':expires': inviteExpiresAt,
+              ':by': body.adminEmail,
+              ':now': now,
+            },
+          })
+        );
+      } else {
+        // Safety net: DynamoDB record missing — create it
+        await ddb.send(
+          new PutCommand({
+            TableName: TABLE_NAME,
+            Item: {
+              id: randomUUID(),
+              __typename: 'User',
+              email: body.username,
+              companyName,
+              firstName: '',
+              lastName: '',
+              phoneNumber: '',
+              profileRole: 'User',
+              status: 'Invited',
+              subscriptionId: adminUser.subscriptionId || '',
+              stripeCustomerId: adminUser.stripeCustomerId || '',
+              inviteToken,
+              inviteExpiresAt,
+              invitedBy: body.adminEmail,
+              atsname: adminUser.atsname || '',
+              apikeytype: adminUser.apikeytype || '',
+              apikey1: adminUser.apikey1 || '',
+              apikey2: adminUser.apikey2 || '',
+              createdAt: now,
+              updatedAt: now,
+            },
+          })
+        );
+      }
+    } else {
+      // New user — create DynamoDB record
+      await ddb.send(
+        new PutCommand({
+          TableName: TABLE_NAME,
+          Item: {
+            id: randomUUID(),
+            __typename: 'User',
+            email: body.username,
+            companyName,
+            firstName: '',
+            lastName: '',
+            phoneNumber: '',
+            profileRole: 'User',
+            status: 'Invited',
+            subscriptionId: adminUser.subscriptionId || '',
+            stripeCustomerId: adminUser.stripeCustomerId || '',
+            inviteToken,
+            inviteExpiresAt,
+            invitedBy: body.adminEmail,
+            atsname: adminUser.atsname || '',
+            apikeytype: adminUser.apikeytype || '',
+            apikey1: adminUser.apikey1 || '',
+            apikey2: adminUser.apikey2 || '',
+            createdAt: now,
+            updatedAt: now,
+          },
+        })
+      );
+    }
 
     // Update Stripe subscription quantity +1
     if (adminUser.subscriptionId) {

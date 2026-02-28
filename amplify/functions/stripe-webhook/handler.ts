@@ -64,7 +64,7 @@ const createUserSubscriptionMutation = /* GraphQL */ `
 const updateUserMutation = /* GraphQL */ `
   mutation UpdateUser($input: UpdateUserInput!) {
     updateUser(input: $input) {
-      id subscriptionId stripeCustomerId
+      id subscriptionId stripeCustomerId status
     }
   }
 `;
@@ -156,6 +156,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             id: userId,
             subscriptionId: subscription.id,
             stripeCustomerId: session.customer as string,
+            status: 'Active',
           },
         });
 

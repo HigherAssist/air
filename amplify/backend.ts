@@ -326,7 +326,7 @@ createCognitoUserLambda.addToRolePolicy(
 );
 createCognitoUserLambda.addToRolePolicy(
   new iam.PolicyStatement({
-    actions: ['cognito-idp:AdminCreateUser'],
+    actions: ['cognito-idp:AdminCreateUser', 'cognito-idp:AdminSetUserPassword'],
     resources: [`arn:aws:cognito-idp:${dataStack.region}:${dataStack.account}:userpool/*`],
   })
 );
