@@ -34,11 +34,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routers
-app.include_router(jobs.router)
-app.include_router(candidates.router)
-app.include_router(matches.router)
-app.include_router(chat.router)
+# Register routers — all under /api to match ALB path-routing rule
+app.include_router(jobs.router, prefix="/api")
+app.include_router(candidates.router, prefix="/api")
+app.include_router(matches.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 
 @app.on_event("startup")
