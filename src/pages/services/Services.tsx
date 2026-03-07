@@ -19,11 +19,11 @@ const Services: React.FC = () => {
     // Fallback: derive from current hostname
     const hostname = window.location.hostname;
     if (hostname.startsWith('www.') || hostname === 'air-app.com') {
-      return `https://prod.air-app.com:7860/?__theme=light&token=${dbUser.id}`;
+      return `https://prod.hireassist.net:7860/?__theme=light&token=${dbUser.id}`;
     } else if (hostname.startsWith('stage.')) {
-      return `https://stage.air-app.com:7860/?__theme=light&token=${dbUser.id}`;
+      return `https://stage.hireassist.net:7860/?__theme=light&token=${dbUser.id}`;
     }
-    return `https://dev.air-app.com:7860/?__theme=light&token=${dbUser.id}`;
+    return `https://dev.hireassist.net:7860/?__theme=light&token=${dbUser.id}`;
   };
 
   return (

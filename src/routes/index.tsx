@@ -20,6 +20,7 @@ const ChangePassword = lazy(
 );
 const Subscribe = lazy(() => import('pages/subscribe/Subscribe'));
 const Services = lazy(() => import('pages/services/Services'));
+const Sourcing = lazy(() => import('pages/sourcing/Sourcing'));
 const Support = lazy(() => import('pages/support/Support'));
 const Profile = lazy(() => import('pages/profile/Profile'));
 const TermsCondition = lazy(
@@ -38,6 +39,9 @@ export const Routes = () => {
           </Route>
           <Route element={<RequireAuth />}>
             <Route path="/services" element={<Services />} />
+          </Route>
+          <Route element={<RequireAuth />}>
+            <Route path="/sourcing" element={<Sourcing />} />
           </Route>
           <Route element={<RequireAuth />}>
             <Route path="/support" element={<Support />} />
