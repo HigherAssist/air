@@ -194,7 +194,7 @@ async def vector_search_candidates(
             LIMIT :limit
             """
         ),
-        {"vec": str(job.embedding), "limit": limit},
+        {"vec": "[" + ",".join(str(v) for v in job.embedding) + "]", "limit": limit},
     )
     rows = result.fetchall()
 
@@ -221,7 +221,7 @@ async def vector_search_by_query(
     query_embedding = emb.embed_text(query)
 
     conditions = "c.embedding IS NOT NULL"
-    params: dict = {"vec": str(query_embedding), "limit": limit}
+    params: dict = {"vec": "[" + ",".join(str(v) for v in query_embedding) + "]", "limit": limit}
 
     if location_filter:
         conditions += " AND LOWER(c.location) LIKE :location"
