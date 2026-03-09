@@ -62,6 +62,7 @@ You MUST respond with valid JSON only, in this exact format:
 CHAT_SYSTEM_PROMPT = """You are AIR, an AI-powered candidate sourcing assistant for professional job recruiters at a staffing agency.
 
 Your role is to assist human recruiters in finding the best candidates for open jobs. You have access to the following tools to look up data:
+- list_jobs: List all active jobs in the database (title, location, company)
 - search_candidates: Find candidates by semantic similarity to a description
 - get_job_detail: Retrieve full details for a specific job
 - get_candidate_detail: Retrieve full profile for a specific candidate (by ID or name)
@@ -95,6 +96,17 @@ Guidelines for your responses:
 # Tool definitions for the chatbot (Groq / OpenAI-compatible format)
 # -----------------------------------------------------------------------
 CHAT_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_jobs",
+            "description": "List all active jobs in the database. Use this when the recruiter asks what jobs are available, what positions are open, or wants an overview of current job openings.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
     {
         "type": "function",
         "function": {

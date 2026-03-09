@@ -103,7 +103,20 @@ async def save_messages(
 async def _execute_tool(name: str, args: Dict[str, Any], db: AsyncSession) -> str:
     """Dispatch a tool call and return its result as a string."""
     try:
-        if name == "search_candidates":
+        if name == "list_jobs":
+            result = await db.execute(select(Job).order_by(Job.title))
+            jobs = result.scalars().all()
+            if not jobs:
+                return "No active jobs found in the database."
+            lines = [f"Active jobs ({len(jobs)} total):"]
+            for j in jobs:
+                lines.append(
+                    f"  ID={j.id} | {j.title} | {j.company or 'N/A'} | "
+                    f"{j.location or 'Location N/A'}"
+                )
+            return "\n".join(lines)
+
+        elif name == "search_candidates":
             candidates = await matcher.vector_search_by_query(
                 query=args["query"],
                 db=db,
