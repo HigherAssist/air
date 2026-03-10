@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     GROQ_TEMPERATURE: float = 0.1        # Conservative: grounded, factual answers
     GROQ_MAX_TOKENS: int = 1024
-    GROQ_TIMEOUT_SECONDS: int = 15       # Configurable response timeout
+    GROQ_TIMEOUT_SECONDS: int = 30       # Configurable response timeout
 
     # ------------------------------------------------------------------ #
     # Loxo ATS API
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     MAX_CHAT_SESSIONS: int = 5
     MAX_HISTORY_MESSAGES: int = 20
-    CHAT_TIMEOUT_SECONDS: int = 15
+    CHAT_TIMEOUT_SECONDS: int = 30
 
     # ------------------------------------------------------------------ #
     # Security

@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from groq import RateLimitError
+
 from app.config import get_settings
 from app.db.orm_models import Candidate, ChatMessage, ChatSession, Job, Match
 from app.services import groq_client, matcher
@@ -18,7 +20,12 @@ from app.services.prompts import CHAT_SYSTEM_PROMPT, CHAT_TOOLS
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT_REPLY = "I am sorry, I can't find a good answer to your request."
+TIMEOUT_REPLY = "This request took too long to complete. Please try a simpler question or try again."
+RATE_LIMIT_DAILY_REPLY = (
+    "I've reached my daily AI quota and can't process new requests until midnight UTC. "
+    "Please try again after midnight."
+)
+RATE_LIMIT_MINUTE_REPLY = "I'm temporarily rate-limited. Please wait a moment and try again."
 
 
 # --------------------------------------------------------------------------- #
@@ -108,11 +115,20 @@ async def _execute_tool(name: str, args: Dict[str, Any], db: AsyncSession) -> st
             jobs = result.scalars().all()
             if not jobs:
                 return "No active jobs found in the database."
+            # Get match counts per job in one query
+            from sqlalchemy import func as sqlfunc
+            count_result = await db.execute(
+                select(Match.job_id, sqlfunc.count(Match.id)).group_by(Match.job_id)
+            )
+            match_counts = {row[0]: row[1] for row in count_result}
             lines = [f"Active jobs ({len(jobs)} total):"]
             for j in jobs:
+                remote = " [Remote OK]" if j.remote_work_allowed else ""
+                mc = match_counts.get(j.id, 0)
+                match_info = f"{mc} pre-scored candidates" if mc else "no scores yet — use compute_match"
                 lines.append(
                     f"  ID={j.id} | {j.title} | {j.company or 'N/A'} | "
-                    f"{j.location or 'Location N/A'}"
+                    f"{j.location or 'Location N/A'}{remote} | {match_info}"
                 )
             return "\n".join(lines)
 
@@ -225,8 +241,15 @@ async def _execute_tool(name: str, args: Dict[str, Any], db: AsyncSession) -> st
                 return f"Job {args['job_id']} not found."
             if not candidate:
                 return f"Candidate {args['candidate_id']} not found."
-
-            match = await matcher.score_pair(job, candidate, db, store=True)
+            try:
+                match = await matcher.score_pair(job, candidate, db, store=True)
+            except RateLimitError as e:
+                if "per day" in str(e):
+                    return (
+                        "Daily AI quota reached — on-demand scoring is unavailable until midnight UTC. "
+                        "Use get_top_matches to see pre-computed scores instead."
+                    )
+                return "AI scoring is temporarily rate-limited. Please try again in a moment."
             full_name = f"{candidate.first_name or ''} {candidate.last_name or ''}".strip()
             return (
                 f"Match computed:\n"
@@ -308,14 +331,24 @@ async def handle_chat(
     except asyncio.TimeoutError:
         logger.warning("Chat request timed out for user %s", user_token)
         reply = TIMEOUT_REPLY
-        # We need a session even on timeout
         try:
             session = await get_or_create_session(user_token, session_id, db)
         except Exception:
             return TIMEOUT_REPLY, session_id or ""
+    except RateLimitError as e:
+        if "per day" in str(e):
+            logger.warning("Groq daily token limit hit for user %s", user_token)
+            reply = RATE_LIMIT_DAILY_REPLY
+        else:
+            logger.warning("Groq per-minute rate limit hit for user %s", user_token)
+            reply = RATE_LIMIT_MINUTE_REPLY
+        try:
+            session = await get_or_create_session(user_token, session_id, db)
+        except Exception:
+            return reply, session_id or ""
     except Exception as e:
         logger.error("Chat handler error: %s", e, exc_info=True)
-        reply = TIMEOUT_REPLY
+        reply = "Something went wrong on my end. Please try again."
 
     await save_messages(session, user_message, reply, db)
     await db.commit()
