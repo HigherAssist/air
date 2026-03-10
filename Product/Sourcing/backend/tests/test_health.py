@@ -5,7 +5,8 @@ These should always pass regardless of Groq quota or DB state.
 
 
 def test_health(client):
-    resp = client.get("/health")
+    # /health goes to the frontend container via ALB; /api/health goes to backend
+    resp = client.get("/api/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
@@ -26,6 +27,6 @@ def test_sessions_endpoint(client, user_token):
 
 
 def test_docs_available(client):
-    """FastAPI /docs should be reachable (useful during dev)."""
+    """FastAPI /docs is served by the frontend container via ALB default rule."""
     resp = client.get("/docs")
-    assert resp.status_code == 200
+    assert resp.status_code == 200  # frontend SPA returns 200

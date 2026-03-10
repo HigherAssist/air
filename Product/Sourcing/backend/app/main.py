@@ -53,3 +53,9 @@ async def startup():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/health")
+async def api_health():
+    """ALB-routed health endpoint for external callers and tests."""
+    return {"status": "ok"}
