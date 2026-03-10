@@ -91,9 +91,13 @@ Guidelines for your responses:
 
 10. If asked about candidates you have no data for (not in the database), say so clearly rather than guessing.
 
-11. When asked for candidate details for a specific job (e.g. "show me the profile of the top candidate for job X"), ALWAYS call get_top_matches first to get the real candidate IDs, then call get_candidate_detail with the integer ID from those results.
+11. IMPORTANT — IDs are always integers. job_id and candidate_id fields MUST be plain integers (e.g. 12345). NEVER pass a job title, candidate name, or any descriptive text into these fields.
 
-12. When calling get_candidate_detail: if you have an exact integer ID from a prior tool result, pass it as candidate_id. If you only have a name, pass it as name. NEVER pass descriptive text or a placeholder into candidate_id."""
+12. When the user refers to a job by name (e.g. "Project Manager at Graton"), you do NOT know its job_id. You MUST first call list_jobs to find the matching job and get its integer ID, then use that integer ID in get_job_detail, get_top_matches, or compute_match.
+
+13. When asked for candidate details for a specific job, call get_top_matches (using the integer job_id from list_jobs) to get real candidate IDs first, then call get_candidate_detail with the integer candidate_id from those results.
+
+14. When calling get_candidate_detail: if you have an exact integer ID from a prior tool result, pass it as candidate_id. If you only have a name, pass it as name. NEVER pass descriptive text into candidate_id."""
 
 
 # -----------------------------------------------------------------------
@@ -144,13 +148,13 @@ CHAT_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_job_detail",
-            "description": "Retrieve full details for a specific job including description, requirements, pay rate, and location.",
+            "description": "Retrieve full details for a specific job including description, requirements, pay rate, and location. Requires an integer job_id from list_jobs — never pass a job title string.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "job_id": {
                         "type": "integer",
-                        "description": "The Loxo job ID.",
+                        "description": "The exact numeric Loxo job ID obtained from list_jobs. Must be a plain integer like 56789. Never pass a job title or description.",
                     },
                 },
                 "required": ["job_id"],
@@ -181,13 +185,13 @@ CHAT_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_top_matches",
-            "description": "Get the pre-computed top candidate matches for a job, ranked by match score.",
+            "description": "Get the pre-computed top candidate matches for a job, ranked by match score. Requires an integer job_id from list_jobs — never pass a job title string.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "job_id": {
                         "type": "integer",
-                        "description": "The Loxo job ID.",
+                        "description": "The exact numeric Loxo job ID obtained from list_jobs. Must be a plain integer like 56789. Never pass a job title or description.",
                     },
                     "limit": {
                         "type": "integer",
@@ -202,17 +206,17 @@ CHAT_TOOLS = [
         "type": "function",
         "function": {
             "name": "compute_match",
-            "description": "Compute an on-demand LLM match score for a specific job-candidate pair. Use this when the recruiter asks about a specific candidate for a specific job, or when there is no pre-computed score.",
+            "description": "Compute an on-demand LLM match score for a specific job-candidate pair. Use this when the recruiter asks about a specific candidate for a specific job, or when there is no pre-computed score. Both IDs must be exact integers from prior tool results.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "job_id": {
                         "type": "integer",
-                        "description": "The Loxo job ID.",
+                        "description": "The exact numeric Loxo job ID from list_jobs. Must be a plain integer.",
                     },
                     "candidate_id": {
                         "type": "integer",
-                        "description": "The Loxo person ID.",
+                        "description": "The exact numeric Loxo person ID from search_candidates or get_top_matches. Must be a plain integer.",
                     },
                 },
                 "required": ["job_id", "candidate_id"],
