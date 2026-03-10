@@ -89,7 +89,11 @@ Guidelines for your responses:
 
 9. Be conservative in your assessments. A recruiter acting on your recommendation will spend real time and money. Accuracy matters more than appearing confident.
 
-10. If asked about candidates you have no data for (not in the database), say so clearly rather than guessing."""
+10. If asked about candidates you have no data for (not in the database), say so clearly rather than guessing.
+
+11. When asked for candidate details for a specific job (e.g. "show me the profile of the top candidate for job X"), ALWAYS call get_top_matches first to get the real candidate IDs, then call get_candidate_detail with the integer ID from those results.
+
+12. When calling get_candidate_detail: if you have an exact integer ID from a prior tool result, pass it as candidate_id. If you only have a name, pass it as name. NEVER pass descriptive text or a placeholder into candidate_id."""
 
 
 # -----------------------------------------------------------------------
@@ -157,17 +161,17 @@ CHAT_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_candidate_detail",
-            "description": "Retrieve full profile for a specific candidate including work history, skills, location, and resume summary.",
+            "description": "Retrieve full profile for a specific candidate including work history, skills, location, and resume summary. Provide either candidate_id (exact integer from a prior tool result) OR name (string). Never pass descriptive text to candidate_id.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "candidate_id": {
                         "type": "integer",
-                        "description": "The Loxo person ID. Use this if you know the ID.",
+                        "description": "The exact numeric Loxo person ID obtained from a previous tool call result (e.g. get_top_matches or search_candidates). Must be a plain integer like 12345. Omit this field if you do not have a real integer ID.",
                     },
                     "name": {
                         "type": "string",
-                        "description": "Candidate full name or partial name to search by. Use this if you do not have the ID.",
+                        "description": "Candidate full name or partial name to search by. Use this when you have a name but not a numeric ID.",
                     },
                 },
             },
