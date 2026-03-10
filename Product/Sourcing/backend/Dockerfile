@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system dependencies for pdfplumber and psycopg2
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc libpoppler-cpp-dev poppler-utils \
+    libpq-dev gcc libpoppler-cpp-dev poppler-utils curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

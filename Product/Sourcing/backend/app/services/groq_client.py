@@ -59,6 +59,11 @@ async def chat_completion(
             logger.warning("Groq request timed out after %ds", effective_timeout)
             raise
         except RateLimitError as e:
+            # Daily token quota errors won't resolve for hours — don't retry, fail fast
+            err_body = getattr(e, "body", None) or {}
+            if isinstance(err_body, dict) and err_body.get("error", {}).get("type") == "tokens":
+                logger.warning("Groq daily token quota exhausted — raising immediately")
+                raise
             wait = 2 ** attempt + 1
             logger.warning("Groq rate limit hit (attempt %d/%d), sleeping %ds: %s", attempt + 1, retries, wait, e)
             if attempt < retries - 1:
