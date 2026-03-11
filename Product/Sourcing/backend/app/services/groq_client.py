@@ -7,7 +7,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from groq import AsyncGroq, RateLimitError
+from groq import AsyncGroq, BadRequestError, RateLimitError
 
 from app.config import get_settings
 
@@ -58,6 +58,10 @@ async def chat_completion(
             return response
         except asyncio.TimeoutError:
             logger.warning("Groq request timed out after %ds", effective_timeout)
+            raise
+        except BadRequestError:
+            # Malformed tool call (wrong arg types, args embedded in function name, etc.)
+            # Retrying the exact same request will always fail — raise immediately.
             raise
         except RateLimitError as e:
             # Daily token quota errors won't resolve for hours — don't retry, fail fast

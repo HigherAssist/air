@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from groq import RateLimitError
+from groq import BadRequestError, RateLimitError
 
 from app.config import get_settings
 from app.db.orm_models import Candidate, ChatMessage, ChatSession, Job, Match
@@ -26,6 +26,7 @@ RATE_LIMIT_DAILY_REPLY = (
     "Please try again after midnight."
 )
 RATE_LIMIT_MINUTE_REPLY = "I'm temporarily rate-limited. Please wait a moment and try again."
+BAD_REQUEST_REPLY = "I had trouble processing that request. Please try rephrasing your question."
 
 
 # --------------------------------------------------------------------------- #
@@ -335,6 +336,15 @@ async def handle_chat(
             session = await get_or_create_session(user_token, session_id, db)
         except Exception:
             return TIMEOUT_REPLY, session_id or ""
+    except BadRequestError as e:
+        # Malformed tool call (LLM embedded args in function name, or passed wrong type).
+        # These 400s never succeed on retry — return a friendly rephrase prompt.
+        logger.warning("Groq bad request (malformed tool call) for user %s: %s", user_token, e)
+        reply = BAD_REQUEST_REPLY
+        try:
+            session = await get_or_create_session(user_token, session_id, db)
+        except Exception:
+            return reply, session_id or ""
     except RateLimitError as e:
         if "per day" in str(e):
             logger.warning("Groq daily token limit hit for user %s", user_token)

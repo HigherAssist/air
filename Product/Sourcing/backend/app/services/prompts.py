@@ -137,7 +137,7 @@ CHAT_TOOLS = [
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of candidates to return (default 10, max 25).",
+                        "description": "Maximum number of candidates to return. Must be a plain integer like 10. Do not pass as a string.",
                     },
                 },
                 "required": ["query"],
