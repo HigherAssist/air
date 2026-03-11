@@ -294,8 +294,8 @@ async def handle_chat(
             messages.extend(history)
             messages.append({"role": "user", "content": user_message})
 
-            # Tool-calling loop (max 3 rounds to prevent infinite loops)
-            for _ in range(3):
+            # Tool-calling loop (max 6 rounds to prevent infinite loops)
+            for _ in range(6):
                 response = await groq_client.chat_completion(
                     messages=messages,
                     tools=CHAT_TOOLS,
