@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 def _get_client() -> AsyncGroq:
     settings = get_settings()
-    return AsyncGroq(api_key=settings.GROQ_API_KEY)
+    # max_retries=0: disable SDK built-in retry so our code handles 429s immediately
+    return AsyncGroq(api_key=settings.GROQ_API_KEY, max_retries=0)
 
 
 async def chat_completion(
