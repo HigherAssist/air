@@ -180,6 +180,60 @@ class LoxoClient:
             if not scroll_id:
                 break
 
+    # ---------------------------------------------------------------------- #
+    # Users / Recruiters
+    # ---------------------------------------------------------------------- #
+
+    def get_users(self) -> List[Dict]:
+        """Fetch all users (recruiters) in the agency."""
+        data = self._get("/users")
+        return data if isinstance(data, list) else data.get("users", [])
+
+    # ---------------------------------------------------------------------- #
+    # Activity Types
+    # ---------------------------------------------------------------------- #
+
+    def get_activity_types(self) -> List[Dict]:
+        """Fetch all activity type definitions."""
+        data = self._get("/activity_types")
+        return data if isinstance(data, list) else data.get("activity_types", [])
+
+    # ---------------------------------------------------------------------- #
+    # Person Events (recruiter activity log)
+    # ---------------------------------------------------------------------- #
+
+    def iter_person_events(self, after: Optional[str] = None) -> Iterator[Dict]:
+        """
+        Iterate over all person events using scroll_id pagination.
+        after: ISO date string e.g. "2025-09-15" — filters events by created_at >= date.
+        Yields individual event dicts.
+        """
+        scroll_id = None
+        page = 0
+        total_yielded = 0
+        while True:
+            params: Dict[str, Any] = {}
+            if after:
+                params["after"] = after
+            if scroll_id:
+                params["scroll_id"] = scroll_id
+            data = self._get("/person_events", params=params)
+            events = data.get("person_events", [])
+            if not events:
+                break
+            for event in events:
+                yield event
+            total_yielded += len(events)
+            scroll_id = data.get("scroll_id")
+            total = data.get("total_count", "?")
+            page += 1
+            logger.debug(
+                "Person events page %d: %d records (yielded=%d total=%s)",
+                page, len(events), total_yielded, total,
+            )
+            if not scroll_id:
+                break
+
     def close(self):
         self._client.close()
 

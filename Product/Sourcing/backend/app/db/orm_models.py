@@ -1,6 +1,7 @@
 """
 SQLAlchemy ORM models.
-Tables: jobs, candidates, matches, chat_sessions, chat_messages
+Tables: jobs, candidates, matches, chat_sessions, chat_messages,
+        recruiters, recruiter_activities
 """
 import uuid
 from datetime import datetime
@@ -143,3 +144,41 @@ class ChatMessage(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     session = relationship("ChatSession", back_populates="messages")
+
+
+class Recruiter(Base):
+    """Loxo user / recruiter synced from /users endpoint."""
+
+    __tablename__ = "recruiters"
+
+    id = Column(Integer, primary_key=True)          # Loxo user id
+    name = Column(String(200), nullable=False)
+    email = Column(String(200))
+    loxo_updated_at = Column(DateTime(timezone=True))
+    synced_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    activities = relationship("RecruiterActivity", back_populates="recruiter")
+
+
+class RecruiterActivity(Base):
+    """Recruiter activity event from Loxo person_events endpoint.
+
+    event_date  — created_at from Loxo (scheduled/actual date of the activity)
+    candidate_id / job_id — no FK constraint; may reference records not in our DB
+    """
+
+    __tablename__ = "recruiter_activities"
+
+    id = Column(BigInteger, primary_key=True)        # Loxo person_event id
+    recruiter_id = Column(Integer, ForeignKey("recruiters.id", ondelete="SET NULL"), nullable=True, index=True)
+    recruiter_name = Column(String(200))             # denormalized for fast queries
+    activity_type_id = Column(Integer)
+    activity_type_name = Column(String(200))         # e.g. "Contacted / Sent Email"
+    activity_category = Column(String(100), index=True)  # top-level: "Contacted", "Sourced", etc.
+    candidate_id = Column(BigInteger, index=True)    # Loxo person_id (nullable)
+    job_id = Column(BigInteger, index=True)          # Loxo job_id (nullable)
+    notes = Column(Text)                             # HTML-stripped recruiter notes
+    event_date = Column(DateTime(timezone=True), index=True)  # created_at from Loxo
+    synced_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    recruiter = relationship("Recruiter", back_populates="activities")
