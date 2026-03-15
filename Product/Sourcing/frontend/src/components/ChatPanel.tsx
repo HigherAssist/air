@@ -31,7 +31,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       <MessageList messages={messages} isLoading={isLoading} />
 
       {/* Fixed input area at the bottom */}
-      <InputBox onSend={onSend} isLoading={isLoading} onNewChat={onNewChat} />
+      <InputBox onSend={onSend} isLoading={isLoading} />
     </div>
   );
 };

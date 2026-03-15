@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
@@ -29,4 +30,4 @@ class CandidateDetail(CandidateSummary):
     resume_text: Optional[str] = None
     job_profiles: Optional[List[Dict[str, Any]]] = None
     education_profiles: Optional[List[Dict[str, Any]]] = None
-    last_synced_at: Optional[str] = None
+    last_synced_at: Optional[datetime] = None

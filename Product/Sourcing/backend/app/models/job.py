@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
@@ -25,4 +26,4 @@ class JobDetail(JobSummary):
     salary_min: Optional[float] = None
     salary_max: Optional[float] = None
     pipeline_counts: Optional[List[Dict[str, Any]]] = None
-    last_synced_at: Optional[str] = None
+    last_synced_at: Optional[datetime] = None

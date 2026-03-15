@@ -1,13 +1,19 @@
-import React, { useRef, useCallback, KeyboardEvent } from 'react';
+import React, { useRef, useCallback, useEffect, KeyboardEvent } from 'react';
 
 interface InputBoxProps {
   onSend: (message: string) => void;
   isLoading: boolean;
-  onNewChat: () => void;
 }
 
-export const InputBox: React.FC<InputBoxProps> = ({ onSend, isLoading, onNewChat }) => {
+export const InputBox: React.FC<InputBoxProps> = ({ onSend, isLoading }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Return focus to the input whenever the loading spinner stops
+  useEffect(() => {
+    if (!isLoading) {
+      textareaRef.current?.focus();
+    }
+  }, [isLoading]);
 
   const handleSend = useCallback(() => {
     const value = textareaRef.current?.value.trim();
@@ -67,15 +73,6 @@ export const InputBox: React.FC<InputBoxProps> = ({ onSend, isLoading, onNewChat
         </button>
       </div>
 
-      {/* Start New Chat button below input */}
-      <div className="mt-2 flex justify-center">
-        <button
-          onClick={onNewChat}
-          className="text-xs text-gray-400 hover:text-brand transition-colors"
-        >
-          Start New Chat
-        </button>
-      </div>
     </div>
   );
 };

@@ -4,10 +4,11 @@ import type { ChatRequest, ChatResponse, Message, Session } from '../types';
 const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}` : '/api';
 
 const http = axios.create({ baseURL: BASE, timeout: 20000 });
+const chatHttp = axios.create({ baseURL: BASE, timeout: 90000 });
 
 export const api = {
   sendMessage: async (req: ChatRequest): Promise<ChatResponse> => {
-    const { data } = await http.post<ChatResponse>('/chat', req);
+    const { data } = await chatHttp.post<ChatResponse>('/chat', req);
     return data;
   },
 

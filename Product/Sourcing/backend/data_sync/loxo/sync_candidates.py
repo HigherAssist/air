@@ -90,6 +90,19 @@ def _infer_current_role(person: dict) -> tuple:
     return "", ""
 
 
+def _split_name(person: dict) -> tuple:
+    """Split Loxo 'name' field into first_name / last_name.
+    Loxo does not return separate first_name / last_name fields.
+    """
+    full = (person.get("name") or "").strip()
+    if not full:
+        return None, None
+    parts = full.split(" ", 1)
+    first = parts[0].capitalize() if parts[0] else None
+    last = parts[1].title() if len(parts) > 1 else None
+    return first, last
+
+
 def upsert_candidate(
     person_data: dict,
     status_id: int,
@@ -102,6 +115,7 @@ def upsert_candidate(
     from app.db.orm_models import Candidate
 
     person_id = int(person_data["id"])
+    first_name, last_name = _split_name(person_data)
     location = _derive_location(person_data)
     current_title, current_company = _infer_current_role(person_data)
     email = _extract_primary_email(person_data)
@@ -138,8 +152,8 @@ def upsert_candidate(
             or existing.resume_text != resume_text
             or existing.embedding is None
         )
-        existing.first_name = person_data.get("first_name")
-        existing.last_name = person_data.get("last_name")
+        existing.first_name = first_name
+        existing.last_name = last_name
         existing.email = email
         existing.phone = phone
         existing.city = person_data.get("city")
@@ -163,8 +177,8 @@ def upsert_candidate(
     else:
         new_candidate = Candidate(
             id=person_id,
-            first_name=person_data.get("first_name"),
-            last_name=person_data.get("last_name"),
+            first_name=first_name,
+            last_name=last_name,
             email=email,
             phone=phone,
             city=person_data.get("city"),

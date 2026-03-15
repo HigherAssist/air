@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     GROQ_TEMPERATURE: float = 0.1        # Conservative: grounded, factual answers
-    GROQ_MAX_TOKENS: int = 1024
-    GROQ_TIMEOUT_SECONDS: int = 30       # Configurable response timeout
+    GROQ_MAX_TOKENS: int = 2048
+    GROQ_TIMEOUT_SECONDS: int = 45       # Configurable response timeout
 
     # ------------------------------------------------------------------ #
     # Loxo ATS API
@@ -69,8 +69,9 @@ class Settings(BaseSettings):
     # Chat / session management
     # ------------------------------------------------------------------ #
     MAX_CHAT_SESSIONS: int = 5
-    MAX_HISTORY_MESSAGES: int = 20
-    CHAT_TIMEOUT_SECONDS: int = 30
+    MAX_HISTORY_MESSAGES: int = 8        # Last 4 exchanges — keeps context tight
+    CHAT_TIMEOUT_SECONDS: int = 90
+    CHAT_TOKEN_ALERT_THRESHOLD: int = 6000  # Warn if input tokens exceed this
 
     # ------------------------------------------------------------------ #
     # Security
