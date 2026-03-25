@@ -27,7 +27,7 @@ const App: React.FC = () => {
     // Fill the entire iframe/window
     return (
       <div className="h-screen w-screen bg-gray-100 flex items-stretch">
-        <ChatWidget userToken={userToken} onClose={() => setIsOpen(false)} />
+        <ChatWidget userToken={userToken} onClose={() => window.parent.postMessage({ type: 'close-air' }, '*')} />
       </div>
     );
   }

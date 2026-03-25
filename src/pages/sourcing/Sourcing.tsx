@@ -1,9 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'shared/hooks';
 import { WithSubscription } from 'shared/components';
 
 const Sourcing: React.FC = () => {
   const { dbUser } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'close-air') {
+        navigate('/account');
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [navigate]);
+
   if (!dbUser) {
     return null;
   }
