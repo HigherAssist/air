@@ -8,6 +8,8 @@ import logging
 import re
 import time
 import uuid
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import func, select
@@ -16,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from groq import BadRequestError, RateLimitError
 
 from app.config import get_settings
-from app.db.orm_models import Candidate, ChatMessage, ChatSession, Job, Match
+from app.db.orm_models import Candidate, ChatMessage, ChatSession, Job, Match, Recruiter, RecruiterActivity
 from app.services import groq_client, matcher
 from app.services.prompts import CHAT_SYSTEM_PROMPT, CHAT_TOOLS
 
@@ -255,6 +257,187 @@ async def _execute_tool(name: str, args: Dict[str, Any], db: AsyncSession) -> st
                     f"  Title: {c.current_title or 'N/A'} | Location: {c.location or 'Unknown'}\n"
                     f"  Reasoning: {m.reasoning or 'N/A'}"
                 )
+            return "\n".join(lines)
+
+        elif name == "list_recruiters":
+            from sqlalchemy import func as sqlfunc
+            result = await db.execute(select(Recruiter).order_by(Recruiter.name))
+            recruiters = result.scalars().all()
+            if not recruiters:
+                return "No recruiters found in the database."
+            since = datetime.now(timezone.utc) - timedelta(days=30)
+            count_result = await db.execute(
+                select(RecruiterActivity.recruiter_id, sqlfunc.count(RecruiterActivity.id))
+                .where(RecruiterActivity.event_date >= since)
+                .group_by(RecruiterActivity.recruiter_id)
+            )
+            counts_30d = {row[0]: row[1] for row in count_result}
+            lines = [f"Recruiters in the system ({len(recruiters)} total):"]
+            for r in recruiters:
+                cnt = counts_30d.get(r.id, 0)
+                lines.append(f"  - {r.name} | {r.email or 'no email'} | {cnt} activities (last 30 days)")
+            return "\n".join(lines)
+
+        elif name == "search_activities":
+            from sqlalchemy import func as sqlfunc
+            recruiter_name = args.get("recruiter_name")
+            job_id_filter = args.get("job_id")
+            candidate_id_filter = args.get("candidate_id")
+            category = args.get("category")
+            days = int(args.get("days", 30))
+            limit = min(int(args.get("limit", 50)), 150)
+            group_by = args.get("group_by")  # "job", "candidate", or None
+            since = datetime.now(timezone.utc) - timedelta(days=days)
+
+            # Resolve recruiter name to ID if provided
+            recruiter_id_filter = None
+            resolved_recruiter_name = None
+            if recruiter_name:
+                rq = await db.execute(select(Recruiter).order_by(Recruiter.name))
+                all_recruiters = rq.scalars().all()
+                matched = [r for r in all_recruiters if recruiter_name.lower() in r.name.lower()]
+                if not matched:
+                    known = ", ".join(r.name for r in all_recruiters)
+                    return f"No recruiter found matching '{recruiter_name}'. Known recruiters: {known}"
+                recruiter_id_filter = matched[0].id
+                resolved_recruiter_name = matched[0].name
+
+            # Build shared filter description
+            filter_parts = []
+            if resolved_recruiter_name:
+                filter_parts.append(f"recruiter={resolved_recruiter_name}")
+            if job_id_filter is not None:
+                filter_parts.append(f"job={job_id_filter}")
+            if candidate_id_filter is not None:
+                filter_parts.append(f"candidate={candidate_id_filter}")
+            if category:
+                filter_parts.append(f"category={category}")
+            filter_parts.append(f"days={days}")
+
+            if group_by == "job":
+                # Return one row per unique job with activity count — server-side dedup
+                count_col = sqlfunc.count(RecruiterActivity.id).label("cnt")
+                q = (
+                    select(RecruiterActivity.job_id, count_col)
+                    .where(RecruiterActivity.event_date >= since)
+                    .group_by(RecruiterActivity.job_id)
+                    .order_by(count_col.desc())
+                    .limit(limit)
+                )
+                if recruiter_id_filter is not None:
+                    q = q.where(RecruiterActivity.recruiter_id == recruiter_id_filter)
+                if job_id_filter is not None:
+                    q = q.where(RecruiterActivity.job_id == int(job_id_filter))
+                if candidate_id_filter is not None:
+                    q = q.where(RecruiterActivity.candidate_id == int(candidate_id_filter))
+                if category:
+                    q = q.where(RecruiterActivity.activity_category == category)
+
+                rows = (await db.execute(q)).all()
+                if not rows:
+                    return "No activities found matching those filters."
+
+                job_ids_set = {r.job_id for r in rows if r.job_id}
+                job_map: dict = {}
+                if job_ids_set:
+                    jq = await db.execute(select(Job.id, Job.title).where(Job.id.in_(job_ids_set)))
+                    job_map = {j.id: j.title for j in jq}
+
+                lines = [f"Jobs with activity ({len(rows)} unique) — {', '.join(filter_parts)}:"]
+                for r in rows:
+                    title = (job_map.get(r.job_id) or f"job {r.job_id}")[:60] if r.job_id else "—"
+                    lines.append(f"  ID={r.job_id} | {title} | {r.cnt} activities")
+                return "\n".join(lines)
+
+            elif group_by == "candidate":
+                # Return one row per unique candidate with activity count — server-side dedup
+                count_col = sqlfunc.count(RecruiterActivity.id).label("cnt")
+                q = (
+                    select(RecruiterActivity.candidate_id, count_col)
+                    .where(RecruiterActivity.event_date >= since)
+                    .group_by(RecruiterActivity.candidate_id)
+                    .order_by(count_col.desc())
+                    .limit(limit)
+                )
+                if recruiter_id_filter is not None:
+                    q = q.where(RecruiterActivity.recruiter_id == recruiter_id_filter)
+                if job_id_filter is not None:
+                    q = q.where(RecruiterActivity.job_id == int(job_id_filter))
+                if candidate_id_filter is not None:
+                    q = q.where(RecruiterActivity.candidate_id == int(candidate_id_filter))
+                if category:
+                    q = q.where(RecruiterActivity.activity_category == category)
+
+                rows = (await db.execute(q)).all()
+                if not rows:
+                    return "No activities found matching those filters."
+
+                cand_ids = {r.candidate_id for r in rows if r.candidate_id}
+                cand_map: dict = {}
+                if cand_ids:
+                    cq = await db.execute(
+                        select(Candidate.id, Candidate.first_name, Candidate.last_name)
+                        .where(Candidate.id.in_(cand_ids))
+                    )
+                    for cid, fn, ln in cq:
+                        cand_map[cid] = f"{fn or ''} {ln or ''}".strip() or f"ID={cid}"
+
+                lines = [f"Candidates with activity ({len(rows)} unique) — {', '.join(filter_parts)}:"]
+                for r in rows:
+                    name_str = cand_map.get(r.candidate_id, f"ID={r.candidate_id}") if r.candidate_id else "—"
+                    lines.append(f"  ID={r.candidate_id} | {name_str} | {r.cnt} activities")
+                return "\n".join(lines)
+
+            # Default: raw event rows (for timeline / detail / notes questions)
+            q = (
+                select(RecruiterActivity)
+                .where(RecruiterActivity.event_date >= since)
+                .order_by(RecruiterActivity.event_date.desc())
+                .limit(limit)
+            )
+            if recruiter_id_filter is not None:
+                q = q.where(RecruiterActivity.recruiter_id == recruiter_id_filter)
+            if job_id_filter is not None:
+                q = q.where(RecruiterActivity.job_id == int(job_id_filter))
+            if candidate_id_filter is not None:
+                q = q.where(RecruiterActivity.candidate_id == int(candidate_id_filter))
+            if category:
+                q = q.where(RecruiterActivity.activity_category == category)
+
+            acts_result = await db.execute(q)
+            activities = acts_result.scalars().all()
+
+            if not activities:
+                return "No activities found matching those filters."
+
+            # Bulk-resolve candidate names and job titles
+            candidate_ids = {a.candidate_id for a in activities if a.candidate_id}
+            job_ids_set = {a.job_id for a in activities if a.job_id}
+            cand_map = {}
+            job_map = {}
+            if candidate_ids:
+                cq = await db.execute(
+                    select(Candidate.id, Candidate.first_name, Candidate.last_name)
+                    .where(Candidate.id.in_(candidate_ids))
+                )
+                for cid, fn, ln in cq:
+                    cand_map[cid] = f"{fn or ''} {ln or ''}".strip() or f"ID={cid}"
+            if job_ids_set:
+                jq = await db.execute(
+                    select(Job.id, Job.title).where(Job.id.in_(job_ids_set))
+                )
+                job_map = {j.id: j.title for j in jq}
+
+            header = f"Activities ({len(activities)} records) — {', '.join(filter_parts)}:"
+            lines = [header]
+            for act in activities:
+                date_str = act.event_date.strftime("%Y-%m-%d") if act.event_date else "?"
+                rname = act.recruiter_name or "?"
+                atype = act.activity_type_name or act.activity_category or "?"
+                cand_str = cand_map.get(act.candidate_id, f"ID={act.candidate_id}") if act.candidate_id else "—"
+                job_str = (job_map.get(act.job_id, f"job {act.job_id}") or "")[:50] if act.job_id else "—"
+                note_str = f" | Note: {act.notes[:120]}" if act.notes else ""
+                lines.append(f"  [{date_str}] {rname} | {atype} | {cand_str} | {job_str}{note_str}")
             return "\n".join(lines)
 
         else:
