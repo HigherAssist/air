@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
 import type { Session } from '../types';
+import { api } from '../services/api';
 
 interface SidePanelProps {
   sessions: Session[];
@@ -24,6 +25,15 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Session[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [latestSync, setLatestSync] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getStatus().then(({ latest_loxo_sync }) => {
+      if (latest_loxo_sync) {
+        setLatestSync(format(new Date(latest_loxo_sync), 'MM-dd-yyyy HH:mm:ss'));
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) {
@@ -148,6 +158,11 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
       {/* Footer */}
       <div className="border-t border-gray-200 p-3 space-y-2">
+        {latestSync && (
+          <p className="text-xs text-gray-400 leading-tight">
+            Most recent ATS update: {latestSync}
+          </p>
+        )}
         <p className="text-xs text-gray-400 leading-tight">
           AI may produce inaccurate results. Your use of this product must be consistent with our{' '}
           <a

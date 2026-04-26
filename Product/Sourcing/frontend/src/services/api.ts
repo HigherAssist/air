@@ -36,4 +36,9 @@ export const api = {
     const { data } = await http.post<Session[]>('/chat/search', { user_token: userToken, query });
     return data;
   },
+
+  getStatus: async (): Promise<{ latest_loxo_sync: string | null }> => {
+    const { data } = await http.get<{ latest_loxo_sync: string | null }>('/status');
+    return data;
+  },
 };

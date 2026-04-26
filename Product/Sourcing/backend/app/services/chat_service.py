@@ -19,6 +19,7 @@ from groq import BadRequestError, RateLimitError
 
 from app.config import get_settings
 from app.db.orm_models import Candidate, ChatMessage, ChatSession, Job, Match, Recruiter, RecruiterActivity
+from sqlalchemy import func as sqla_func
 from app.services import groq_client, matcher
 from app.services.prompts import CHAT_SYSTEM_PROMPT, CHAT_TOOLS
 
@@ -520,6 +521,23 @@ async def _recover_from_xml_tool_call(
 
 
 # --------------------------------------------------------------------------- #
+# Sync timestamp helper
+# --------------------------------------------------------------------------- #
+
+async def _get_latest_sync_label(db: AsyncSession) -> str:
+    """Return a human-readable UTC timestamp of the most recent Loxo data sync."""
+    from app.db.orm_models import Candidate, Job, RecruiterActivity
+    jobs_max = await db.scalar(select(sqla_func.max(Job.last_synced_at)))
+    cands_max = await db.scalar(select(sqla_func.max(Candidate.last_synced_at)))
+    acts_max = await db.scalar(select(sqla_func.max(RecruiterActivity.synced_at)))
+    timestamps = [t for t in [jobs_max, cands_max, acts_max] if t is not None]
+    if not timestamps:
+        return "unknown"
+    latest = max(timestamps)
+    return latest.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+# --------------------------------------------------------------------------- #
 # Main chat handler
 # --------------------------------------------------------------------------- #
 
@@ -624,7 +642,14 @@ async def handle_chat(
             session = await get_or_create_session(user_token, session_id, db)
             history = await load_history(session, db)
 
-            messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+            sync_label = await _get_latest_sync_label(db)
+            system_content = (
+                CHAT_SYSTEM_PROMPT
+                + f"\n\nDATA FRESHNESS: Your Loxo ATS data was last synced on {sync_label}. "
+                "Use this date when answering any question about when data was last updated."
+            )
+
+            messages = [{"role": "system", "content": system_content}]
             messages.extend(history)
             messages.append({"role": "user", "content": user_message})
 
@@ -638,7 +663,7 @@ async def handle_chat(
                     request_id, user_token[:8], e,
                 )
                 messages_no_history = [
-                    {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+                    {"role": "system", "content": system_content},
                     {"role": "user", "content": user_message},
                 ]
                 try:

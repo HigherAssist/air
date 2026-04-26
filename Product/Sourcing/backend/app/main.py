@@ -7,7 +7,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import candidates, chat, jobs, matches
+from app.api import candidates, chat, jobs, matches, status
 from app.config import configure_logging, get_settings
 from app.db.session import get_engine
 from app.db.orm_models import Base
@@ -39,6 +39,7 @@ app.include_router(jobs.router, prefix="/api")
 app.include_router(candidates.router, prefix="/api")
 app.include_router(matches.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(status.router, prefix="/api")
 
 
 @app.on_event("startup")
