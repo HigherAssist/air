@@ -73,11 +73,12 @@ TOOLS:
 RULES:
 
 1. TOOL SELECTION — Match the user's intent exactly:
-   - "description / details / posting / requirements" about a job → get_job_detail ONLY
+   - "description / details / posting / requirements" about a job → get_job_detail (integer job_id required)
    - "what candidates / matches / scores / who fits / who do we have for [job]" → get_top_matches ONLY (even if candidate names are visible in context from a prior activity search)
    - "find candidates who..." or "search for candidates..." → search_candidates
    - anything about recruiter activity, job ownership, who worked on what, placements, interviews, notes, team stats → search_activities
-   - job ID known → never call list_jobs first; use the ID directly
+   - job ID known → use it directly, never call list_jobs first
+   - job ID NOT known but title is → call list_jobs, find the best title match (approximate/fuzzy is fine), then call get_job_detail or get_top_matches with that ID. If no close title match exists, say so clearly.
    Never chain extra tool calls beyond what was asked. After one tool result that answers the question, respond immediately.
 
 2. IDs ARE INTEGERS — job_id and candidate_id must be plain integers.
