@@ -1,5 +1,9 @@
 # AIR — Project Instructions for Claude
 
+## Meta-Instructions
+- Whenever a new convention is established or a permanent instruction is given, update this CLAUDE.md file immediately.
+- Before every task, verify the plan against the rules in this CLAUDE.md file.
+
 ## Project Overview
 AIR is a subscription-based SaaS application with user authentication, billing management, and account administration. Users can sign up, manage subscriptions via Stripe, and administer their account/company profile.
 
