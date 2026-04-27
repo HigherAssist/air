@@ -302,7 +302,7 @@ def build_suites(job1_id: int, job1_title: str, job2_id: int, job2_title: str,
                 Turn(
                     message=f"What is {candidate_name}'s current phone number?",
                     expect=["not available", "not on file", "n/a", "don't have",
-                            "no phone", "no contact", "not found", "not in"],
+                            "no phone", "no contact", "not found", "not in", "not listed"],
                     reject=["+1", "(555)", "555-"],
                     label="phone number — must say not available, not invent one",
                     allow_fallback=True,
