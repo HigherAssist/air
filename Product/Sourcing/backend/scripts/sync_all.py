@@ -51,7 +51,7 @@ S3_STATUS_KEY  = "sync-status/latest.json"
 
 def run_script(script: str, extra_args: list[str] = ()) -> dict:
     """Run a script/app/scripts/<script> and capture output + timing."""
-    cmd = ["python", f"scripts/{script}"] + list(extra_args)
+    cmd = ["python", script] + list(extra_args)
     logger.info("▶ Running: %s", " ".join(cmd))
     start = datetime.now(timezone.utc)
     result = subprocess.run(
@@ -190,17 +190,17 @@ def main():
     components = {}
 
     # ── 1. Jobs + Candidates ──────────────────────────────────────────────────
-    result = run_script("sync_main.py")
+    result = run_script("data_sync/sync_main.py")
     components["jobs_candidates"] = {**result, **extract_counts(result["output"], "jobs_candidates")}
     logger.info("jobs_candidates: %s (%.0fs)", "OK" if result["success"] else "FAILED", result["duration_s"])
 
     # ── 2. Match Scores ───────────────────────────────────────────────────────
-    result = run_script("run_matching.py")
+    result = run_script("scripts/run_matching.py")
     components["match_scores"] = {**result, **extract_counts(result["output"], "match_scores")}
     logger.info("match_scores: %s (%.0fs)", "OK" if result["success"] else "FAILED", result["duration_s"])
 
     # ── 3. Recruiter Activity ─────────────────────────────────────────────────
-    result = run_script("sync_recruiter_activity.py", ["--since", since_date])
+    result = run_script("scripts/sync_recruiter_activity.py", ["--since", since_date])
     components["recruiter_activity"] = {**result, **extract_counts(result["output"], "recruiter_activity")}
     logger.info("recruiter_activity: %s (%.0fs)", "OK" if result["success"] else "FAILED", result["duration_s"])
 
