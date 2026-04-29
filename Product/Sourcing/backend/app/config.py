@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     SYNC_INTERVAL_HOURS: int = 24
     # Loxo person_global_status_id values to include (Option B)
-    CANDIDATE_STATUS_IDS: str = "30199,30200,30201,30202,30203,30204,30207"
+    CANDIDATE_STATUS_IDS: str = "30198,30199,30200,30201,30202,30203,30204,30207"
     LOXO_ACTIVE_JOB_STATUS_ID: int = 6875
 
     # ------------------------------------------------------------------ #
