@@ -50,25 +50,42 @@ def main():
         print(f"  Jobs without embeddings: {no_embed}")
 
         # --- Candidates ---
+        # All 10 Loxo person global statuses — includes ones we intentionally skip
+        ALL_STATUSES = {
+            30198: ("uncontacted",    True),   # (name, synced)
+            30199: ("contacted",      True),
+            30200: ("applied",        True),
+            30201: ("replied",        True),
+            30202: ("in_progress",    True),
+            30203: ("nurture",        True),
+            30204: ("unresponsive",   True),
+            30205: ("do_not_contact", False),  # intentionally excluded
+            30206: ("bad_data",       False),  # intentionally excluded
+            30207: ("hired",          True),
+        }
+
         print("\nCandidates by status:")
-        print(f"  {'Status':<16} {'DB':>8}  {'Loxo API':>10}  {'Check':>8}")
-        print(f"  {'-'*16} {'-'*8}  {'-'*10}  {'-'*8}")
+        print(f"  {'Status':<16} {'Synced':>6}  {'DB':>8}  {'Loxo API':>10}  {'Check':>8}")
+        print(f"  {'-'*16} {'-'*6}  {'-'*8}  {'-'*10}  {'-'*8}")
 
         total_db = 0
         total_loxo = 0
-        for status_id, status_name in STATUS_NAMES.items():
+        for status_id, (status_name, synced) in ALL_STATUSES.items():
             db_count = db.execute(
                 select(func.count()).where(Candidate.global_status == status_name)
             ).scalar()
-            # Get Loxo count from first page (total_count field)
             try:
                 data = client._get("/people", params={"person_global_status_id": status_id})
                 loxo_count = data.get("total_count", "?")
             except Exception:
                 loxo_count = "ERR"
 
-            check = "OK" if str(db_count) == str(loxo_count) else "≠"
-            print(f"  {status_name:<16} {db_count:>8}  {str(loxo_count):>10}  {check:>8}")
+            if not synced:
+                check = "SKIP"
+            else:
+                check = "OK" if str(db_count) == str(loxo_count) else "≠"
+            sync_label = "yes" if synced else "no"
+            print(f"  {status_name:<16} {sync_label:>6}  {db_count:>8}  {str(loxo_count):>10}  {check:>8}")
             total_db += db_count
             if isinstance(loxo_count, int):
                 total_loxo += loxo_count

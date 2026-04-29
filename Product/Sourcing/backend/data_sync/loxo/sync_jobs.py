@@ -10,7 +10,7 @@ from typing import List
 
 sys.path.insert(0, "/app")  # Allow imports when run as ECS task
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -126,12 +126,16 @@ def upsert_job(job_data: dict, db: Session, embedder) -> None:
 
 def sync_all_jobs(loxo_client, db: Session, embedder, status_id: int = 6875) -> int:
     """
-    Pull all active jobs from Loxo and upsert into DB.
-    Returns the count of jobs synced.
+    Pull all active jobs from Loxo, upsert into DB, and remove any DB jobs
+    no longer present in Loxo's active list.
+    Returns the count of active jobs synced.
     """
+    from app.db.orm_models import Job, Match
+
     jobs = loxo_client.get_all_active_jobs(status_id=status_id)
     logger.info("Syncing %d active jobs from Loxo...", len(jobs))
 
+    active_ids = set()
     for job_data in jobs:
         # Fetch full detail (summary endpoint may be missing description)
         try:
@@ -140,6 +144,17 @@ def sync_all_jobs(loxo_client, db: Session, embedder, status_id: int = 6875) -> 
             logger.warning("Could not fetch full detail for job %s: %s", job_data["id"], e)
             full = job_data
         upsert_job(full, db, embedder)
+        active_ids.add(int(job_data["id"]))
 
-    logger.info("Jobs sync complete: %d jobs.", len(jobs))
+    # Remove DB jobs that are no longer active in Loxo
+    all_db_ids = {row[0] for row in db.execute(select(Job.id)).fetchall()}
+    stale_ids = all_db_ids - active_ids
+    if stale_ids:
+        logger.info("Removing %d stale jobs from DB: %s", len(stale_ids), sorted(stale_ids))
+        for job_id in stale_ids:
+            db.execute(Match.__table__.delete().where(Match.job_id == job_id))
+            db.execute(Job.__table__.delete().where(Job.id == job_id))
+        db.commit()
+
+    logger.info("Jobs sync complete: %d active, %d removed.", len(jobs), len(stale_ids))
     return len(jobs)

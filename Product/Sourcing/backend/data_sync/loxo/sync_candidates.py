@@ -16,8 +16,9 @@ def _clean(value):
         return value.replace("\x00", "")
     return value
 
-# Option B: all statuses except Do Not Contact, Bad Data, Uncontacted
+# All statuses except Do Not Contact (30205) and Bad Data (30206)
 DEFAULT_STATUS_IDS = [
+    30198,  # Uncontacted
     30199,  # Contacted
     30200,  # Applied
     30201,  # Replied
@@ -28,6 +29,7 @@ DEFAULT_STATUS_IDS = [
 ]
 
 STATUS_NAMES = {
+    30198: "uncontacted",
     30199: "contacted",
     30200: "applied",
     30201: "replied",
