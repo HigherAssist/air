@@ -123,7 +123,7 @@ def upsert_candidate(
     email = _extract_primary_email(person_data)
     phone = _extract_primary_phone(person_data)
     skills = _extract_skills(person_data)
-    global_status = STATUS_NAMES.get(status_id, "unknown")
+    global_status = STATUS_NAMES.get(status_id) if status_id else None
 
     # Clean NUL bytes from text fields before inserting into PostgreSQL
     current_title = _clean(current_title)
@@ -206,6 +206,63 @@ def upsert_candidate(
     db.commit()
 
 
+# Statuses intentionally excluded from sync — recruiters have marked these as unusable
+EXCLUDED_STATUS_IDS = {30205, 30206}  # do_not_contact, bad_data
+
+
+def sync_all_candidates(
+    loxo_client,
+    db,
+    embedder,
+    fetch_full_profile: bool = True,
+    download_resumes: bool = True,
+    s3_bucket: Optional[str] = None,
+) -> int:
+    """
+    Sync all people from Loxo regardless of global status.
+    Skips only do_not_contact (30205) and bad_data (30206).
+    Returns total candidates synced.
+    """
+    total = 0
+    skipped = 0
+
+    for summary in loxo_client.iter_people(status_id=None):
+        person_id = summary["id"]
+        # Read status from summary — skip excluded ones early to avoid a full-profile fetch
+        summary_status = summary.get("person_global_status_id")
+        if summary_status in EXCLUDED_STATUS_IDS:
+            skipped += 1
+            continue
+        try:
+            if fetch_full_profile:
+                person_data = loxo_client.get_person(person_id)
+            else:
+                person_data = summary
+
+            status_id = person_data.get("person_global_status_id")
+            if status_id in EXCLUDED_STATUS_IDS:
+                skipped += 1
+                continue
+
+            upsert_candidate(
+                person_data=person_data,
+                status_id=status_id,
+                db=db,
+                embedder=embedder,
+                loxo_client=loxo_client if download_resumes else None,
+                s3_bucket=s3_bucket,
+            )
+            total += 1
+            if total % 100 == 0:
+                logger.info("  %d candidates synced, %d skipped...", total, skipped)
+        except Exception as e:
+            logger.error("Failed to sync person %s: %s", person_id, e, exc_info=True)
+            continue
+
+    logger.info("Candidate sync complete: %d synced, %d skipped (do_not_contact/bad_data).", total, skipped)
+    return total
+
+
 def sync_candidates_by_status(
     loxo_client,
     db,
@@ -215,10 +272,7 @@ def sync_candidates_by_status(
     download_resumes: bool = True,
     s3_bucket: Optional[str] = None,
 ) -> int:
-    """
-    Sync all candidates for the given status IDs.
-    Returns total candidates synced.
-    """
+    """Deprecated: use sync_all_candidates() instead."""
     if status_ids is None:
         status_ids = DEFAULT_STATUS_IDS
 
@@ -227,15 +281,10 @@ def sync_candidates_by_status(
         status_name = STATUS_NAMES.get(status_id, str(status_id))
         count = 0
         logger.info("Syncing candidates with status: %s (id=%d)...", status_name, status_id)
-
-        for summary in loxo_client.iter_people_by_status(status_id):
+        for summary in loxo_client.iter_people(status_id):
             person_id = summary["id"]
             try:
-                if fetch_full_profile:
-                    person_data = loxo_client.get_person(person_id)
-                else:
-                    person_data = summary
-
+                person_data = loxo_client.get_person(person_id) if fetch_full_profile else summary
                 upsert_candidate(
                     person_data=person_data,
                     status_id=status_id,
@@ -250,8 +299,6 @@ def sync_candidates_by_status(
             except Exception as e:
                 logger.error("Failed to sync person %s: %s", person_id, e, exc_info=True)
                 continue
-
         logger.info("Completed status %s: %d candidates.", status_name, count)
         total += count
-
     return total

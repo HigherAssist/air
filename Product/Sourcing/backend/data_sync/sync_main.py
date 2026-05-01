@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from data_sync.loxo.client import LoxoClient
 from data_sync.loxo.sync_jobs import sync_all_jobs
-from data_sync.loxo.sync_candidates import sync_candidates_by_status
+from data_sync.loxo.sync_candidates import sync_all_candidates
 
 # Import embedder from backend (shared module)
 from app.services.embeddings import embed_job, embed_candidate
@@ -73,11 +73,10 @@ def main():
             logger.info("Jobs synced: %d", job_count)
 
         if not args.jobs_only:
-            candidate_count = sync_candidates_by_status(
+            candidate_count = sync_all_candidates(
                 loxo_client=client,
                 db=db,
                 embedder=embedder,
-                status_ids=settings.candidate_status_id_list,
                 fetch_full_profile=True,
                 download_resumes=True,
                 s3_bucket=settings.S3_BUCKET,

@@ -126,15 +126,19 @@ class LoxoClient:
     # People / Candidates
     # ---------------------------------------------------------------------- #
 
-    def iter_people_by_status(self, status_id: int) -> Iterator[Dict]:
+    def iter_people(self, status_id: Optional[int] = None) -> Iterator[Dict]:
         """
-        Iterate over all people with a given global status using scroll_id pagination.
+        Iterate over all people using scroll_id pagination.
+        If status_id is given, filters to that global status only.
+        If status_id is None, returns all people regardless of status.
         Yields individual person summary dicts.
         """
         scroll_id = None
         page = 0
         while True:
-            params: Dict[str, Any] = {"person_global_status_id": status_id}
+            params: Dict[str, Any] = {}
+            if status_id is not None:
+                params["person_global_status_id"] = status_id
             if scroll_id:
                 params["scroll_id"] = scroll_id
             data = self._get("/people", params=params)
@@ -145,9 +149,14 @@ class LoxoClient:
                 yield person
             scroll_id = data.get("scroll_id")
             page += 1
-            logger.debug("People (status %d) page %d: %d records, scroll_id=%s", status_id, page, len(people), scroll_id)
+            label = str(status_id) if status_id is not None else "all"
+            logger.debug("People (status=%s) page %d: %d records, scroll_id=%s", label, page, len(people), scroll_id)
             if not scroll_id:
                 break
+
+    def iter_people_by_status(self, status_id: int) -> Iterator[Dict]:
+        """Deprecated: use iter_people(status_id) instead."""
+        return self.iter_people(status_id)
 
     def get_person(self, person_id: int) -> Dict:
         """Fetch full profile for a single person."""

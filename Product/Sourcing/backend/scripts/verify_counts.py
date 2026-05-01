@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db.orm_models import Candidate, Job, Match
 from data_sync.loxo.client import LoxoClient
-from data_sync.loxo.sync_candidates import STATUS_NAMES
+from data_sync.loxo.sync_candidates import STATUS_NAMES, EXCLUDED_STATUS_IDS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s — %(message)s")
 logger = logging.getLogger(__name__)
@@ -91,6 +91,27 @@ def main():
                 total_loxo += loxo_count
 
         print(f"  {'TOTAL':<16} {total_db:>8}  {total_loxo:>10}")
+
+        # Total Loxo people vs DB (catches null-status gap)
+        try:
+            loxo_total_data = client._get("/people", params={"per_page": 1})
+            loxo_total = loxo_total_data.get("total_count", "?")
+        except Exception:
+            loxo_total = "ERR"
+        excluded = sum(
+            db.execute(select(func.count()).where(Candidate.global_status_id == sid)).scalar()
+            for sid in EXCLUDED_STATUS_IDS
+        )
+        synced_total = db.execute(select(func.count()).select_from(Candidate)).scalar()
+        loxo_syncable = (loxo_total - total_loxo + total_db) if isinstance(loxo_total, int) else "?"
+        null_status_loxo = (loxo_total - total_loxo) if isinstance(loxo_total, int) else "?"
+        print(f"\n  Loxo total people (all statuses): {loxo_total}")
+        print(f"  Loxo with known status:           {total_loxo}  (incl. {excluded} excluded)")
+        print(f"  Loxo with no status set:          {null_status_loxo}")
+        print(f"  DB total:                         {synced_total}")
+        gap = (loxo_total - excluded - synced_total) if isinstance(loxo_total, int) else "?"
+        status = "OK" if gap == 0 else f"GAP of {gap}"
+        print(f"  Coverage check (Loxo - excluded - DB): [{status}]")
 
         # Candidates missing embeddings
         no_embed_c = db.execute(
