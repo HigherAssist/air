@@ -232,7 +232,7 @@ CHAT_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_top_matches",
-            "description": "Get the pre-computed top candidate matches for a job, ranked by match score. Use this ONLY when the user asks who the best candidates are, who matches a job, or wants to see candidate scores. Do NOT use this when the user is asking for a job description, job details, or job requirements — use get_job_detail for those. Requires an integer job_id — never pass a job title string.",
+            "description": "Get candidates for a job. Returns two sections: (1) candidates the recruiter has explicitly added to the job pipeline in Loxo — always shown first regardless of score; (2) top AI-scored candidates not yet in the pipeline. Use this when the user asks who the candidates are, who matches a job, or wants to see scores. Do NOT use this for job descriptions — use get_job_detail for those. Requires an integer job_id.",
             "parameters": {
                 "type": "object",
                 "properties": {

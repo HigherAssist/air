@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from groq import BadRequestError, RateLimitError
 
 from app.config import get_settings
-from app.db.orm_models import Candidate, ChatMessage, ChatSession, Job, Match, Recruiter, RecruiterActivity
+from app.db.orm_models import Candidate, ChatMessage, ChatSession, Job, JobPipeline, Match, Recruiter, RecruiterActivity
 from sqlalchemy import func as sqla_func
 from app.services import groq_client, matcher
 from app.services.prompts import CHAT_SYSTEM_PROMPT, CHAT_TOOLS
@@ -240,24 +240,57 @@ async def _execute_tool(name: str, args: Dict[str, Any], db: AsyncSession) -> st
         elif name == "get_top_matches":
             job_id = int(args["job_id"])
             limit = min(int(args.get("limit", 10)), 20)
-            result = await db.execute(
-                select(Match, Candidate)
-                .join(Candidate, Match.candidate_id == Candidate.id)
-                .where(Match.job_id == job_id)
-                .order_by(Match.score.desc())
-                .limit(limit)
+
+            # Pipeline candidates first — explicitly associated by recruiters in Loxo
+            pipeline_result = await db.execute(
+                select(Candidate, Match, JobPipeline.pipeline_stage)
+                .join(JobPipeline, JobPipeline.candidate_id == Candidate.id)
+                .outerjoin(Match, (Match.job_id == job_id) & (Match.candidate_id == Candidate.id))
+                .where(JobPipeline.job_id == job_id)
+                .order_by(Match.score.desc().nullslast())
             )
-            rows = result.all()
-            if not rows:
-                return f"No pre-computed scores available for job {job_id}. Scores are updated nightly."
-            lines = [f"Top {len(rows)} matches for Job {job_id}:"]
-            for m, c in rows:
-                full_name = f"{c.first_name or ''} {c.last_name or ''}".strip()
-                lines.append(
-                    f"\n  #{m.score}/100 — {full_name} (ID={c.id})\n"
-                    f"  Title: {c.current_title or 'N/A'} | Location: {c.location or 'Unknown'}\n"
-                    f"  Reasoning: {m.reasoning or 'N/A'}"
+            pipeline_rows = pipeline_result.all()
+            pipeline_ids = {c.id for c, _, _ in pipeline_rows}
+
+            # Fill remaining slots with top AI matches not already in pipeline
+            remaining = max(0, limit - len(pipeline_rows))
+            ai_rows = []
+            if remaining > 0:
+                ai_result = await db.execute(
+                    select(Match, Candidate)
+                    .join(Candidate, Match.candidate_id == Candidate.id)
+                    .where(Match.job_id == job_id)
+                    .where(Candidate.id.notin_(pipeline_ids) if pipeline_ids else True)
+                    .order_by(Match.score.desc())
+                    .limit(remaining)
                 )
+                ai_rows = ai_result.all()
+
+            if not pipeline_rows and not ai_rows:
+                return f"No candidates or pre-computed scores found for job {job_id}."
+
+            lines = []
+            if pipeline_rows:
+                lines.append(f"📋 In pipeline ({len(pipeline_rows)}):")
+                for c, m, stage in pipeline_rows:
+                    full_name = f"{c.first_name or ''} {c.last_name or ''}".strip()
+                    score_str = f"Score: {m.score}/100" if m else "Score: pending (will be computed tonight)"
+                    stage_str = f" | Stage: {stage}" if stage else ""
+                    reasoning = f"\n    Reasoning: {m.reasoning}" if m and m.reasoning else ""
+                    lines.append(
+                        f"  {score_str} — {full_name} (ID={c.id}){stage_str}\n"
+                        f"  Title: {c.current_title or 'N/A'} | Location: {c.location or 'Unknown'}"
+                        f"{reasoning}"
+                    )
+            if ai_rows:
+                lines.append(f"\n🔍 Top AI matches not in pipeline ({len(ai_rows)}):")
+                for m, c in ai_rows:
+                    full_name = f"{c.first_name or ''} {c.last_name or ''}".strip()
+                    lines.append(
+                        f"  Score: {m.score}/100 — {full_name} (ID={c.id})\n"
+                        f"  Title: {c.current_title or 'N/A'} | Location: {c.location or 'Unknown'}\n"
+                        f"  Reasoning: {m.reasoning or 'N/A'}"
+                    )
             return "\n".join(lines)
 
         elif name == "list_recruiters":

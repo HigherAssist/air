@@ -124,6 +124,71 @@ def upsert_job(job_data: dict, db: Session, embedder) -> None:
     db.commit()
 
 
+def sync_job_pipeline(job_id: int, loxo_client, db: Session, embedder, s3_bucket: str = None) -> int:
+    """
+    Sync the Loxo pipeline for a single job — candidates the recruiter has explicitly associated.
+    Ensures every pipeline candidate exists in our candidates table (syncs them if not).
+    Removes stale entries for candidates no longer in the Loxo pipeline.
+    Returns count of pipeline candidates.
+    """
+    from app.db.orm_models import Candidate, JobPipeline
+    from data_sync.loxo.sync_candidates import upsert_candidate, EXCLUDED_STATUS_IDS
+
+    pipeline_ids = set()
+
+    for pc in loxo_client.iter_job_candidates(job_id):
+        candidate_id = int(pc["id"])
+        pipeline_ids.add(candidate_id)
+
+        # Ensure candidate exists in our DB; sync if missing
+        if not db.get(Candidate, candidate_id):
+            try:
+                person_data = loxo_client.get_person(candidate_id)
+                status_id_person = person_data.get("person_global_status_id")
+                if status_id_person not in EXCLUDED_STATUS_IDS:
+                    upsert_candidate(person_data, status_id_person, db, embedder,
+                                     loxo_client=loxo_client, s3_bucket=s3_bucket)
+            except Exception as e:
+                logger.warning("Could not sync pipeline candidate %s for job %s: %s", candidate_id, job_id, e)
+                continue
+
+        # Upsert pipeline record
+        stage_data = pc.get("stage") or {}
+        stage_name = stage_data.get("name") if isinstance(stage_data, dict) else None
+
+        existing = db.execute(
+            select(JobPipeline).where(
+                JobPipeline.job_id == job_id,
+                JobPipeline.candidate_id == candidate_id,
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.pipeline_stage = stage_name
+        else:
+            db.add(JobPipeline(job_id=job_id, candidate_id=candidate_id, pipeline_stage=stage_name))
+
+    # Remove candidates no longer in the Loxo pipeline
+    if pipeline_ids:
+        stale = db.execute(
+            select(JobPipeline).where(
+                JobPipeline.job_id == job_id,
+                JobPipeline.candidate_id.notin_(pipeline_ids),
+            )
+        ).scalars().all()
+    else:
+        stale = db.execute(
+            select(JobPipeline).where(JobPipeline.job_id == job_id)
+        ).scalars().all()
+
+    for s in stale:
+        db.delete(s)
+
+    db.commit()
+    logger.info("Job %s pipeline: %d candidates synced, %d stale removed.", job_id, len(pipeline_ids), len(stale))
+    return len(pipeline_ids)
+
+
 def sync_all_jobs(loxo_client, db: Session, embedder, status_id: int = 6875) -> int:
     """
     Pull all active jobs from Loxo, upsert into DB, and remove any DB jobs
@@ -144,7 +209,12 @@ def sync_all_jobs(loxo_client, db: Session, embedder, status_id: int = 6875) -> 
             logger.warning("Could not fetch full detail for job %s: %s", job_data["id"], e)
             full = job_data
         upsert_job(full, db, embedder)
-        active_ids.add(int(job_data["id"]))
+        job_id = int(job_data["id"])
+        active_ids.add(job_id)
+        try:
+            sync_job_pipeline(job_id, loxo_client, db, embedder)
+        except Exception as e:
+            logger.warning("Pipeline sync failed for job %s: %s", job_id, e)
 
     # Remove DB jobs that are no longer active in Loxo
     all_db_ids = {row[0] for row in db.execute(select(Job.id)).fetchall()}

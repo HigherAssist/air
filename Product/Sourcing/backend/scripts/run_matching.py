@@ -34,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.db.orm_models import Job, Match
+from app.db.orm_models import Candidate, Job, JobPipeline, Match
 from app.services.matcher import vector_search_candidates, score_pair
 
 logging.basicConfig(
@@ -79,6 +79,33 @@ async def run(job_id_filter: int = None, force: bool = False):
         logger.info("\n[%d/%d] Job %d: %s", i + 1, len(jobs), job.id, job.title)
 
         async with factory() as db:
+            # Phase 0: Score any pipeline candidates that don't have a score yet
+            pipeline_result = await db.execute(
+                select(Candidate)
+                .join(JobPipeline, JobPipeline.candidate_id == Candidate.id)
+                .outerjoin(Match, (Match.job_id == job.id) & (Match.candidate_id == Candidate.id))
+                .where(JobPipeline.job_id == job.id)
+                .where(Match.id == None)
+            )
+            pipeline_unscored = pipeline_result.scalars().all()
+            if pipeline_unscored:
+                logger.info("  Scoring %d unscored pipeline candidates...", len(pipeline_unscored))
+            for candidate in pipeline_unscored:
+                if not force:
+                    existing = await db.execute(
+                        select(Match).where(Match.job_id == job.id, Match.candidate_id == candidate.id)
+                    )
+                    if existing.scalar_one_or_none():
+                        continue
+                try:
+                    match = await score_pair(job, candidate, db, store=True)
+                    full_name = f"{candidate.first_name or ''} {candidate.last_name or ''}".strip()
+                    logger.info("    [pipeline] %s (ID=%d) → score=%d", full_name, candidate.id, match.score)
+                    total_scored += 1
+                    await asyncio.sleep(settings.MATCH_LLM_SLEEP)
+                except Exception as e:
+                    logger.error("    Error scoring pipeline candidate %d: %s", candidate.id, e)
+
             # Phase 1: Vector similarity pre-filter
             top_candidates = await vector_search_candidates(
                 job, db, limit=settings.MATCH_TOP_K_VECTOR

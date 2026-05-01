@@ -94,6 +94,19 @@ class Candidate(Base):
     matches = relationship("Match", back_populates="candidate", cascade="all, delete-orphan")
 
 
+class JobPipeline(Base):
+    """Candidates explicitly associated with a job in Loxo (recruiter-assigned pipeline)."""
+
+    __tablename__ = "job_pipeline"
+    __table_args__ = (UniqueConstraint("job_id", "candidate_id", name="uq_job_pipeline"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(BigInteger, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_id = Column(BigInteger, nullable=False, index=True)  # No FK — candidate may be synced after
+    pipeline_stage = Column(String(200))
+    synced_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class Match(Base):
     """Pre-computed and on-demand LLM match scores between jobs and candidates."""
 
