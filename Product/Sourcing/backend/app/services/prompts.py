@@ -80,6 +80,8 @@ RULES:
    - job ID known → use it directly, never call list_jobs first
    - job ID NOT known but title is → call list_jobs, find the best title match (approximate/fuzzy is fine), then call get_job_detail or get_top_matches with that ID. If no close title match exists, say so clearly.
    Never chain extra tool calls beyond what was asked. After one tool result that answers the question, respond immediately.
+   - When the user's message contains "ID=XXXXX", extract that integer and use it directly as job_id or candidate_id — never call list_jobs or any lookup tool first.
+   - When the user asks for "all candidates" or "all matches" for a job, call get_top_matches with limit=20 to return the full set.
 
 2. IDs ARE INTEGERS — job_id and candidate_id must be plain integers.
    - The Loxo system ID always appears as `ID=XXXXX` in a job listing — always use THAT exact number.
@@ -240,7 +242,7 @@ CHAT_TOOLS = [
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of top matches to return (default 5, max 20).",
+                        "description": "Maximum number of top matches to return (default 10, max 20). Use 20 when the user asks for 'all' candidates or matches.",
                     },
                 },
                 "required": ["job_id"],

@@ -239,7 +239,7 @@ async def _execute_tool(name: str, args: Dict[str, Any], db: AsyncSession) -> st
 
         elif name == "get_top_matches":
             job_id = int(args["job_id"])
-            limit = min(int(args.get("limit", 5)), 20)
+            limit = min(int(args.get("limit", 10)), 20)
             result = await db.execute(
                 select(Match, Candidate)
                 .join(Candidate, Match.candidate_id == Candidate.id)
@@ -563,7 +563,7 @@ async def handle_chat(
         """Run the tool-calling loop for the given message list. Returns reply text."""
         rounds = 0
         last_tool_signatures: list = []
-        for _ in range(10):
+        for _ in range(15):
             round_t = time.monotonic()
             response = await groq_client.chat_completion(
                 messages=messages,
