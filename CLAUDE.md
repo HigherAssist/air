@@ -141,3 +141,53 @@ npx ampx pipeline-deploy  # CI/CD backend deployment
 - Backend deploys with `npx ampx pipeline-deploy`
 - Frontend builds to `dist/` with `npm run build`
 - Current branch: `dev` | Main branch: `main`
+
+---
+
+## Product/Sourcing — Candidate Sourcing Chatbot
+
+See `memory/sourcing-chatbot.md` for full infrastructure details. Key learnings below.
+
+### Loxo API Response Field Gotchas
+
+These are bugs that have bitten us — always verify against this list before writing new sync code.
+
+**Person status — query param vs response field are different names:**
+- Query param for filtering: `?person_global_status_id=30199` ✓ correct
+- Response field in both summary (`GET /people`) and full profile (`GET /people/{id}`): `person_global_status` — an **object** `{"id": 30199, "key": "contacted", "name": "Contacted", ...}`
+- `person_data.get("person_global_status_id")` always returns `None` — that field does not exist in any response
+- Correct extraction: `(person_data.get("person_global_status") or {}).get("id")`
+
+**Job pipeline candidate ID — entry ID vs person ID:**
+- `GET /jobs/{id}/candidates` returns a list of pipeline-entry objects
+- `entry["id"]` — the pipeline **entry** ID (a Loxo-internal join table ID, NOT a person)
+- `entry["person"]["id"]` — the actual **person** ID to use for lookups and DB storage
+- Using `entry["id"]` as a person ID will 404 on every `/people/{id}` fetch
+
+**Loxo HTTP retries — never retry 4xx:**
+- 4xx errors (especially 404) are deterministic — retrying wastes time
+- Only retry on 5xx server errors and network/timeout failures
+- See `data_sync/loxo/client.py` `_get()` for the implementation
+
+### Data Sync Architecture
+
+- All candidates synced via `sync_all_candidates()` regardless of status — only `do_not_contact` (30205) and `bad_data` (30206) are excluded
+- Candidates with `person_global_status = null` in Loxo are valid and should be synced (they have no status set yet, not excluded)
+- `job_pipeline` table stores person IDs (not pipeline entry IDs); no FK on `candidate_id` because pipeline candidates may not exist in our `candidates` table yet
+- ECS task definition env vars override `config.py` defaults — check task definition `CANDIDATE_STATUS_IDS` when debugging missing candidates
+
+### ECS / Deploy Pattern
+```bash
+# Build + push
+docker build --platform linux/amd64 -t sourcing-backend:latest -f backend/Dockerfile backend/
+aws ecr get-login-password --profile admin --region us-east-2 | docker login --username AWS --password-stdin 457582147377.dkr.ecr.us-east-2.amazonaws.com
+docker tag sourcing-backend:latest 457582147377.dkr.ecr.us-east-2.amazonaws.com/sourcing-backend:latest
+docker push 457582147377.dkr.ecr.us-east-2.amazonaws.com/sourcing-backend:latest
+aws ecs update-service --profile admin --region us-east-2 --cluster sourcing-cluster --service sourcing-backend --force-new-deployment
+
+# One-off script task
+aws ecs run-task --profile admin --region us-east-2 \
+  --cluster sourcing-cluster --task-definition sourcing-backend --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-06a452ef97af5cab9,subnet-0b23795244b24c43b],securityGroups=[sg-07fe7627aa3c57818],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"sourcing-backend","command":["sh","-c","cd /app && PYTHONPATH=/app python scripts/SCRIPT.py"]}]}'
+```

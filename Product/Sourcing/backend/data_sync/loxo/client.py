@@ -73,6 +73,8 @@ class LoxoClient:
                 return response.json()
             except httpx.HTTPStatusError as e:
                 logger.error("HTTP %d for %s: %s", e.response.status_code, url, e)
+                if e.response.status_code < 500:
+                    raise  # Don't retry client errors (4xx) — they won't succeed
                 if attempt < self.max_retries - 1:
                     time.sleep(2 ** attempt)
                 else:

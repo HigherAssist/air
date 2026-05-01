@@ -229,7 +229,8 @@ def sync_all_candidates(
     for summary in loxo_client.iter_people(status_id=None):
         person_id = summary["id"]
         # Read status from summary — skip excluded ones early to avoid a full-profile fetch
-        summary_status = summary.get("person_global_status_id")
+        # Loxo response uses person_global_status (object), not person_global_status_id (integer)
+        summary_status = (summary.get("person_global_status") or {}).get("id")
         if summary_status in EXCLUDED_STATUS_IDS:
             skipped += 1
             continue
@@ -239,7 +240,7 @@ def sync_all_candidates(
             else:
                 person_data = summary
 
-            status_id = person_data.get("person_global_status_id")
+            status_id = (person_data.get("person_global_status") or {}).get("id")
             if status_id in EXCLUDED_STATUS_IDS:
                 skipped += 1
                 continue

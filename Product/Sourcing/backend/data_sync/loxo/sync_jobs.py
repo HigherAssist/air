@@ -137,20 +137,25 @@ def sync_job_pipeline(job_id: int, loxo_client, db: Session, embedder, s3_bucket
     pipeline_ids = set()
 
     for pc in loxo_client.iter_job_candidates(job_id):
-        candidate_id = int(pc["id"])
+        # pc["id"] is the pipeline-entry ID; the actual person lives in pc["person"]["id"]
+        person = pc.get("person") or {}
+        candidate_id = person.get("id")
+        if not candidate_id:
+            continue
+        candidate_id = int(candidate_id)
         pipeline_ids.add(candidate_id)
 
         # Ensure candidate exists in our DB; sync if missing
         if not db.get(Candidate, candidate_id):
             try:
                 person_data = loxo_client.get_person(candidate_id)
-                status_id_person = person_data.get("person_global_status_id")
+                status_id_person = (person_data.get("person_global_status") or {}).get("id")
                 if status_id_person not in EXCLUDED_STATUS_IDS:
                     upsert_candidate(person_data, status_id_person, db, embedder,
                                      loxo_client=loxo_client, s3_bucket=s3_bucket)
             except Exception as e:
                 logger.warning("Could not sync pipeline candidate %s for job %s: %s", candidate_id, job_id, e)
-                continue
+                # Fall through — still record this candidate in job_pipeline even if their profile is unavailable
 
         # Upsert pipeline record
         stage_data = pc.get("stage") or {}
