@@ -131,7 +131,10 @@ def main():
     # Fetch data
     print("\n  Fetching cost data from AWS Cost Explorer...", end="", flush=True)
     prev_costs = get_cost_by_service(client, prev_start, prev_end)
-    curr_costs = get_cost_by_service(client, curr_start, curr_end_actual)
+    if days_elapsed > 0:
+        curr_costs = get_cost_by_service(client, curr_start, curr_end_actual)
+    else:
+        curr_costs = {}
     print(" done.")
 
     # Project current month to full month
@@ -139,7 +142,7 @@ def main():
         scale = days_in_month / days_elapsed
         projected = {k: v * scale for k, v in curr_costs.items()}
     else:
-        projected = dict(curr_costs)
+        projected = dict(prev_costs)  # first day of month — use previous month as projection
 
     # Previous month table (no projection needed — it's complete)
     print_table(
