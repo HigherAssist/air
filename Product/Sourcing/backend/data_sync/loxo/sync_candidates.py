@@ -146,6 +146,7 @@ def upsert_candidate(
     location = _clean(location, 500)
     email = _clean(email, 500)
     phone = _clean(phone, 100)
+    linkedin_url = _clean(person_data.get("linkedin_url"), 500)
 
     existing: Candidate = db.get(Candidate, person_id)
     resume_text = existing.resume_text if existing else None
@@ -180,7 +181,7 @@ def upsert_candidate(
         existing.current_title = current_title
         existing.current_company = current_company
         existing.skills = skills
-        existing.linkedin_url = person_data.get("linkedin_url")
+        existing.linkedin_url = linkedin_url
         existing.global_status = global_status
         existing.global_status_id = status_id
         existing.resume_text = resume_text
@@ -205,7 +206,7 @@ def upsert_candidate(
             current_title=current_title,
             current_company=current_company,
             skills=skills,
-            linkedin_url=person_data.get("linkedin_url"),
+            linkedin_url=linkedin_url,
             global_status=global_status,
             global_status_id=status_id,
             resume_text=resume_text,
