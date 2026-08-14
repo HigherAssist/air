@@ -10,11 +10,24 @@ from typing import List, Optional
 logger = logging.getLogger(__name__)
 
 
-def _clean(value):
-    """Strip NUL bytes from strings — PostgreSQL rejects \x00 in text columns."""
+def _clean(value, max_len: int = None):
+    """Strip NUL bytes and optionally truncate to max_len for VARCHAR columns."""
     if isinstance(value, str):
-        return value.replace("\x00", "")
+        value = value.replace("\x00", "")
+        if max_len and len(value) > max_len:
+            value = value[:max_len]
     return value
+
+
+def _parse_loxo_dt(value) -> Optional[datetime]:
+    """Parse a Loxo ISO-8601 timestamp (e.g. '2026-08-11T17:36:50.000Z') into an
+    aware UTC datetime. Returns None if absent or unparseable."""
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 # All statuses except Do Not Contact (30205) and Bad Data (30206)
 DEFAULT_STATUS_IDS = [
@@ -125,12 +138,14 @@ def upsert_candidate(
     skills = _extract_skills(person_data)
     global_status = STATUS_NAMES.get(status_id) if status_id else None
 
-    # Clean NUL bytes from text fields before inserting into PostgreSQL
-    current_title = _clean(current_title)
-    current_company = _clean(current_company)
-    location = _clean(location)
-    email = _clean(email)
-    phone = _clean(phone)
+    # Clean NUL bytes and truncate to match VARCHAR column limits
+    first_name = _clean(first_name, 200)
+    last_name = _clean(last_name, 200)
+    current_title = _clean(current_title, 500)
+    current_company = _clean(current_company, 500)
+    location = _clean(location, 500)
+    email = _clean(email, 500)
+    phone = _clean(phone, 100)
 
     existing: Candidate = db.get(Candidate, person_id)
     resume_text = existing.resume_text if existing else None
@@ -210,6 +225,9 @@ def upsert_candidate(
 EXCLUDED_STATUS_IDS = {30205, 30206}  # do_not_contact, bad_data
 
 
+MAX_CONSECUTIVE_ERRORS = 10  # Abort if this many candidates fail in a row
+
+
 def sync_all_candidates(
     loxo_client,
     db,
@@ -217,14 +235,25 @@ def sync_all_candidates(
     fetch_full_profile: bool = True,
     download_resumes: bool = True,
     s3_bucket: Optional[str] = None,
+    full_resync: bool = False,
 ) -> int:
     """
     Sync all people from Loxo regardless of global status.
     Skips only do_not_contact (30205) and bad_data (30206).
-    Returns total candidates synced.
+
+    Incremental by default: the full-profile fetch (the expensive per-person API
+    call) is only made when a person is new, has changed in Loxo since we last
+    synced them (summary ``updated_at`` > row ``last_synced_at``), or is missing an
+    embedding. Pass ``full_resync=True`` to force a complete re-fetch of everyone.
+
+    Returns total candidates fetched/upserted (excludes those skipped as unchanged).
     """
+    from app.db.orm_models import Candidate
+
     total = 0
     skipped = 0
+    unchanged = 0
+    consecutive_errors = 0
 
     for summary in loxo_client.iter_people(status_id=None):
         person_id = summary["id"]
@@ -234,6 +263,26 @@ def sync_all_candidates(
         if summary_status in EXCLUDED_STATUS_IDS:
             skipped += 1
             continue
+
+        # Incremental skip: avoid the expensive full-profile fetch when this person
+        # is already synced, unchanged since, and fully embedded. A tz-naive
+        # last_synced_at (legacy rows) can't be compared safely, so we re-fetch it.
+        if not full_resync:
+            existing = db.get(Candidate, person_id)
+            loxo_updated = _parse_loxo_dt(summary.get("updated_at"))
+            if (
+                existing is not None
+                and existing.last_synced_at is not None
+                and existing.last_synced_at.tzinfo is not None
+                and loxo_updated is not None
+                and loxo_updated <= existing.last_synced_at
+                and existing.embedding is not None
+            ):
+                unchanged += 1
+                if (unchanged + total) % 1000 == 0:
+                    logger.info("  progress: %d fetched, %d unchanged, %d skipped...", total, unchanged, skipped)
+                continue
+
         try:
             if fetch_full_profile:
                 person_data = loxo_client.get_person(person_id)
@@ -254,13 +303,24 @@ def sync_all_candidates(
                 s3_bucket=s3_bucket,
             )
             total += 1
+            consecutive_errors = 0
             if total % 100 == 0:
-                logger.info("  %d candidates synced, %d skipped...", total, skipped)
+                logger.info("  %d fetched, %d unchanged, %d skipped...", total, unchanged, skipped)
         except Exception as e:
             logger.error("Failed to sync person %s: %s", person_id, e, exc_info=True)
+            db.rollback()
+            consecutive_errors += 1
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                raise RuntimeError(
+                    f"SYNC ABORTED — {consecutive_errors} consecutive failures (last person_id={person_id}). "
+                    f"Session or API may be stuck. Fix the root cause and rerun."
+                )
             continue
 
-    logger.info("Candidate sync complete: %d synced, %d skipped (do_not_contact/bad_data).", total, skipped)
+    logger.info(
+        "Candidate sync complete: %d synced, %d unchanged, %d skipped (do_not_contact/bad_data).",
+        total, unchanged, skipped,
+    )
     return total
 
 

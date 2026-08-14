@@ -64,7 +64,9 @@ class LoxoClient:
             try:
                 response = self._client.get(url, headers=self._headers(), params=params)
                 if response.status_code == 429:
-                    wait = 2 ** attempt + 2
+                    # Use a long backoff — 30s, 60s, 120s (capped) — Loxo rate limits
+                    # can persist for a minute or more during large bulk fetches.
+                    wait = min(30 * (2 ** attempt), 120)
                     logger.warning("Rate limited by Loxo. Sleeping %ds before retry.", wait)
                     time.sleep(wait)
                     continue

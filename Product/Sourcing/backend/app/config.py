@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     LOXO_USERNAME: str = ""
     LOXO_PASSWORD: str = ""
     LOXO_REQUEST_SLEEP: float = 0.25     # Seconds between bulk API requests
-    LOXO_MAX_RETRIES: int = 3
+    LOXO_MAX_RETRIES: int = 5
 
     # ------------------------------------------------------------------ #
     # AWS / S3

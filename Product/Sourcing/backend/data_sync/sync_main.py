@@ -29,6 +29,7 @@ from data_sync.loxo.sync_candidates import sync_all_candidates
 from app.services.embeddings import embed_job, embed_candidate
 from app.config import get_settings
 
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
@@ -53,10 +54,14 @@ def main():
     parser = argparse.ArgumentParser(description="Loxo → DB sync")
     parser.add_argument("--jobs-only", action="store_true")
     parser.add_argument("--candidates-only", action="store_true")
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Force a full re-fetch of every candidate (default: incremental — only new/changed).",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
-    os.makedirs("logs", exist_ok=True)
 
     start = datetime.utcnow()
     logger.info("=== Sourcing sync started at %s UTC ===", start.isoformat())
@@ -80,6 +85,7 @@ def main():
                 fetch_full_profile=True,
                 download_resumes=True,
                 s3_bucket=settings.S3_BUCKET,
+                full_resync=args.full,
             )
             logger.info("Candidates synced: %d", candidate_count)
 
