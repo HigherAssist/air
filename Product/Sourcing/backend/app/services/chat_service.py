@@ -197,13 +197,18 @@ async def _execute_tool(name: str, args: Dict[str, Any], db: AsyncSession) -> st
             if "candidate_id" in args and args["candidate_id"]:
                 candidate = await db.get(Candidate, int(args["candidate_id"]))
             elif "name" in args and args["name"]:
-                name_lower = args["name"].lower()
-                result = await db.execute(select(Candidate))
-                for c in result.scalars():
-                    full = f"{c.first_name or ''} {c.last_name or ''}".lower()
-                    if name_lower in full:
-                        candidate = c
-                        break
+                name_query = args["name"].strip()
+                result = await db.execute(
+                    select(Candidate)
+                    .where(
+                        func.concat(
+                            func.coalesce(Candidate.first_name, ""), " ",
+                            func.coalesce(Candidate.last_name, ""),
+                        ).ilike(f"%{name_query}%")
+                    )
+                    .limit(5)
+                )
+                candidate = result.scalars().first()
 
             if not candidate:
                 return "Candidate not found in database."
