@@ -1,0 +1,78 @@
+#!/bin/bash
+# Sets log retention on all CloudWatch log groups that have no expiry.
+# Already done: ECS groups (7 days) and Container Insights (3 days).
+# This script handles the remaining Lambda groups.
+
+set -e
+PROFILE="admin"
+REGION="us-east-2"
+DAYS=14
+
+LOG_GROUPS=(
+  "/aws/apigateway/welcome"
+  "/aws/lambda/amplify-air-Hal-sandbox-9-CustomCDKBucketDeploymen-dU7xYkZRdDir"
+  "/aws/lambda/amplify-air-Hal-sandbox-9-CustomS3AutoDeleteObject-CG9XhEosPT9r"
+  "/aws/lambda/amplify-air-Hal-sandbox-9-CustomS3AutoDeleteObject-dq7sKGMVbvds"
+  "/aws/lambda/amplify-air-Hal-sandbox-9-TableManagerCustomProvid-1VdXDr0rzW8a"
+  "/aws/lambda/amplify-air-Hal-sandbox-9-TableManagerCustomProvid-QKt38SHh99Ca"
+  "/aws/lambda/amplify-air-Hal-sandbox-9-aircontactformtriggerlam-dwFTQaqjVSSk"
+  "/aws/lambda/amplify-air-Hal-sandbox-9-airstripewebhooklambda9B-xdqf1R5bMspg"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-AmplifyBranchLinkerCusto-3dcBmSp2aZPR"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-AmplifyBranchLinkerCusto-kRlN3OWrV8Re"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-CustomCDKBucketDeploymen-EgzmnvJYRqsU"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-CustomS3AutoDeleteObject-mEK4jm5FdFAy"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-CustomS3AutoDeleteObject-oqjGBo1sxT7X"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-TableManagerCustomProvid-I2lvbyWqSwfT"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-TableManagerCustomProvid-SVNtmqaOI5hc"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-aircontactformtriggerlam-mlprnGorsedj"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-aircreatecognitouserlamb-zSDzp6RpXuf1"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airdeleteadminuserlambda-IH0FOXx8nMqI"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airpostconfirmationlambd-dykq9CKWWcKf"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airpresignuplambda37D054-LvC7KskN0WzZ"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airsendemailplanquerylam-Kt5LjrbovP0r"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airstripecreatecheckoutl-oJcIUM96XDCp"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airstripecustomerportall-OZXJpSWwW6ST"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airstripegetplanslambda1-31msRJrVb6mv"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airstripegetsubscription-IB74ATCVGH4E"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airstripeupdatesubscript-M6GnQP051BEH"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airstripewebhooklambda9B-6pFNNHaL7oCF"
+  "/aws/lambda/amplify-d3carnh06cjb9r-de-airstripewebhooklambda9B-HQF0VNSwMeyX"
+  "/aws/lambda/amplify-d3carnh06cjb9r-ma-AmplifyBranchLinkerCusto-Q2Nm2J7J0mOh"
+  "/aws/lambda/amplify-d3carnh06cjb9r-ma-AmplifyBranchLinkerCusto-oVjXhUthrbfa"
+  "/aws/lambda/amplify-d3carnh06cjb9r-ma-CustomCDKBucketDeploymen-qMOwlmQFBmD3"
+  "/aws/lambda/amplify-d3carnh06cjb9r-ma-CustomS3AutoDeleteObject-WuKmawoFcrPT"
+  "/aws/lambda/amplify-d3carnh06cjb9r-ma-TableManagerCustomProvid-Vh6bnns0GYSd"
+  "/aws/lambda/amplify-d3carnh06cjb9r-ma-TableManagerCustomProvid-rIwCqrNihe4Q"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-AmplifyBranchLinkerCusto-CupjH5WzEfEw"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-AmplifyBranchLinkerCusto-FbesmkeqB60K"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-AmplifyBranchLinkerCusto-Je2xhaL2JiFW"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-AmplifyBranchLinkerCusto-vLbSsiAtjGBs"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-CustomCDKBucketDeploymen-DvA3o6sRD00A"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-CustomCDKBucketDeploymen-OVJrdoGFoJyN"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-CustomS3AutoDeleteObject-4vV4BEfHZZxm"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-CustomS3AutoDeleteObject-X70URs6TLVOC"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-CustomS3AutoDeleteObject-cwZSUMgRhTzR"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-TableManagerCustomProvid-9TbNsRJFM124"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-TableManagerCustomProvid-cWwCBdzSUyFI"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-TableManagerCustomProvid-czimZAsB7mP2"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-TableManagerCustomProvid-jYTVkSJ2UQMb"
+  "/aws/lambda/amplify-d3carnh06cjb9r-st-airstripewebhooklambda9B-vPDgkK6La2J3"
+  "/aws/lambda/amplify-hireassistwebserv-UpdateRolesWithIDPFuncti-LM7yRbz2jBV3"
+  "/aws/lambda/amplify-hireassistwebserv-UpdateRolesWithIDPFuncti-NH6AgNWn9omD"
+  "/aws/lambda/amplify-hireassistwebserv-UpdateRolesWithIDPFuncti-PwcKLj3ZsCnc"
+  "/aws/lambda/amplify-hireassistwebserv-UpdateRolesWithIDPFuncti-UKPu1twrX7mq"
+  "/aws/lambda/amplify-hireassistwebserver--authTriggerFn7FCFA449-70ijcnNLy9Mp"
+  "/aws/lambda/amplify-hireassistwebserver--authTriggerFn7FCFA449-JD0JBfEIG9Dm"
+  "/aws/lambda/amplify-hireassistwebserver--authTriggerFn7FCFA449-OqQxsTuJb4yq"
+  "/aws/lambda/amplify-hireassistwebserver--authTriggerFn7FCFA449-qHfVDim6MT36"
+  "/aws/lambda/hireassistwebserver8cbe1776PreSignup-staging"
+  "/aws/lambda/hireassistwebserver8cbe1776PreSignup-test"
+  "/aws/lambda/sendEmailForPlanQuery-stage"
+)
+
+echo "Setting ${DAYS}-day retention on ${#LOG_GROUPS[@]} log groups..."
+for lg in "${LOG_GROUPS[@]}"; do
+  aws logs put-retention-policy --profile "$PROFILE" --region "$REGION" \
+    --log-group-name "$lg" --retention-in-days "$DAYS" 2>/dev/null && echo "  ✓ $lg" || echo "  ✗ $lg (skipped)"
+done
+echo "Done."

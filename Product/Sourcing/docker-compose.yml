@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  # PostgreSQL 16 with pgvector extension
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: sourcing-db
+    environment:
+      POSTGRES_USER: sourcing
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: sourcing
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sourcing"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # FastAPI backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sourcing-backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sourcing:changeme@db:5432/sourcing
+      DATABASE_URL_SYNC: postgresql+psycopg2://sourcing:changeme@db:5432/sourcing
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React frontend chatbot UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sourcing-frontend
+    env_file: .env
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

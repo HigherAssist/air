@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev gcc libpoppler-cpp-dev poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY data-sync/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-download the embedding model
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
+COPY . .
+
+RUN mkdir -p logs
+
+CMD ["python", "data-sync/sync_main.py"]
