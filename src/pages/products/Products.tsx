@@ -26,12 +26,9 @@ const Products = () => {
         <div className="text-center container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <h1 className="text-3xl font-bold mt-4">
-              Built by Recruiters For Recruiters
+              With extensive business domain expertise, we build applied AI
+              products for specialized applications
             </h1>
-            <p className="mt-4 text-gray-600 text-lg">
-              Discover the power of generative AI to assist HR/Recruiters with
-              job hires
-            </p>
           </div>
         </div>
       </section>
