@@ -6,7 +6,7 @@ import solutionImage from 'assets/images/solution-candidate-grid.jpg';
 const Home = () => {
   return (
     <>
-      <section className="bg-BlueLagoon text-white py-20">
+      <section className="py-20">
         <div className="text-center container mx-auto px-4">
           <div className="row justify-content-center mb-4">
             <div className="max-w-xl mx-auto">
