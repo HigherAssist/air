@@ -8,11 +8,15 @@ const Home = () => {
           <div className="row justify-content-center">
             <div className="max-w-3xl mx-auto">
               <h1 className="text-4xl font-bold mt-4">
-                AI-Powered Recruiting Assistant
+                Applied AI skills and data solutions to accelerate ROI
               </h1>
               <p className="mt-6 text-lg opacity-90">
-                Discover the power of generative AI to assist HR/Recruiters with
-                job hires. Built by recruiters, for recruiters.
+                <span className="text-4xl font-bold">
+                  HireAssist powers the AI economy with human+digital
+                  intelligence
+                </span>{' '}
+                Intelligence is what you use when you don&apos;t know what to
+                do.
               </p>
             </div>
           </div>

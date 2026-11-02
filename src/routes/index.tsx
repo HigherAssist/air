@@ -10,6 +10,7 @@ const Company = lazy(() => import('pages/company/Company'));
 const Contact = lazy(() => import('pages/contact/Contact'));
 const Success = lazy(() => import('pages/success/Success'));
 const Products = lazy(() => import('pages/products/Products'));
+const AIRecruiter = lazy(() => import('pages/ai-recruiter/AIRecruiter'));
 const PrivacyPolicy = lazy(
   () => import('pages/privacy-policy/PrivacyPolicy')
 );
@@ -65,6 +66,7 @@ export const Routes = () => {
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/success" element={<Success />} />
           <Route path="/sign-in-error" element={<SignInError />} />
+          <Route path="/ai-recruiter" element={<AIRecruiter />} />
           <Route path="/company" element={<Company />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/products" element={<Products />} />

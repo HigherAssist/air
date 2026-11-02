@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
 import { signOut } from 'aws-amplify/auth';
 import { useAuth } from 'shared/hooks';
-import { HiMenu } from 'react-icons/hi';
+import { HiMenu, HiChevronDown } from 'react-icons/hi';
 import { Modal } from 'antd';
 
 const Navigation = () => {
@@ -48,12 +48,50 @@ const Navigation = () => {
               >
                 Home
               </Link>
-              <Link
-                to="/products"
-                className="text-gray-700 hover:text-BlueLagoon px-3 py-2 text-sm font-medium"
-              >
-                Products
-              </Link>
+              <Menu as="div" className="relative">
+                <Menu.Button className="flex items-center text-gray-700 hover:text-BlueLagoon px-3 py-2 text-sm font-medium">
+                  Products
+                  <HiChevronDown className="ml-1 h-4 w-4" />
+                </Menu.Button>
+                <Transition
+                  as={Fragment}
+                  enter="transition ease-out duration-100"
+                  enterFrom="transform opacity-0 scale-95"
+                  enterTo="transform opacity-100 scale-100"
+                  leave="transition ease-in duration-75"
+                  leaveFrom="transform opacity-100 scale-100"
+                  leaveTo="transform opacity-0 scale-95"
+                >
+                  <Menu.Items className="absolute left-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                    <div className="py-1">
+                      <Menu.Item>
+                        {({ active }) => (
+                          <Link
+                            to="/products"
+                            className={`${
+                              active ? 'bg-gray-100' : ''
+                            } block px-4 py-2 text-sm text-gray-700`}
+                          >
+                            Products
+                          </Link>
+                        )}
+                      </Menu.Item>
+                      <Menu.Item>
+                        {({ active }) => (
+                          <Link
+                            to="/ai-recruiter"
+                            className={`${
+                              active ? 'bg-gray-100' : ''
+                            } block px-4 py-2 text-sm text-gray-700`}
+                          >
+                            Recruiter AI Assistant
+                          </Link>
+                        )}
+                      </Menu.Item>
+                    </div>
+                  </Menu.Items>
+                </Transition>
+              </Menu>
               <Link
                 to="/company"
                 className="text-gray-700 hover:text-BlueLagoon px-3 py-2 text-sm font-medium"
