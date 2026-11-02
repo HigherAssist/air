@@ -14,7 +14,10 @@ const PrivacyPolicy = () => {
         <h1 className="text-3xl font-medium mb-2">Who we are</h1>
         <Paragraph>
           We are AIR. Our website address is:{' '}
-          <span className="text-blue-500">https://air-app.com</span>.
+          <a className="text-blue-500" href="https://hireassist.net">
+            https://hireassist.net
+          </a>
+          .
         </Paragraph>
 
         <h1 className="text-3xl font-medium mb-2">Privacy Policy</h1>
