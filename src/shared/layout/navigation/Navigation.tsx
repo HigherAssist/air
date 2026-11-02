@@ -5,6 +5,7 @@ import { signOut } from 'aws-amplify/auth';
 import { useAuth } from 'shared/hooks';
 import { HiMenu, HiChevronDown } from 'react-icons/hi';
 import { Modal } from 'antd';
+import logo from 'assets/images/hireassist-logo-white.png';
 
 const Navigation = () => {
   const navigate = useNavigate();
@@ -34,22 +35,22 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-BlueLagoon shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
-              <span className="text-xl font-bold text-BlueLagoon">AIR</span>
+              <img src={logo} alt="HireAssist Logo" className="h-10 w-auto object-contain" />
             </Link>
             <div className="hidden md:flex ml-10 space-x-8">
               <Link
                 to="/"
-                className="text-gray-700 hover:text-BlueLagoon px-3 py-2 text-sm font-medium"
+                className="text-white hover:opacity-80 px-3 py-2 text-sm font-medium"
               >
                 Home
               </Link>
               <Menu as="div" className="relative">
-                <Menu.Button className="flex items-center text-gray-700 hover:text-BlueLagoon px-3 py-2 text-sm font-medium">
+                <Menu.Button className="flex items-center text-white hover:opacity-80 px-3 py-2 text-sm font-medium">
                   Products
                   <HiChevronDown className="ml-1 h-4 w-4" />
                 </Menu.Button>
@@ -94,13 +95,13 @@ const Navigation = () => {
               </Menu>
               <Link
                 to="/company"
-                className="text-gray-700 hover:text-BlueLagoon px-3 py-2 text-sm font-medium"
+                className="text-white hover:opacity-80 px-3 py-2 text-sm font-medium"
               >
                 Company
               </Link>
               <Link
                 to="/contact"
-                className="text-gray-700 hover:text-BlueLagoon px-3 py-2 text-sm font-medium"
+                className="text-white hover:opacity-80 px-3 py-2 text-sm font-medium"
               >
                 Contact
               </Link>
@@ -111,13 +112,13 @@ const Navigation = () => {
             {!isAuthenticated ? (
               <Link
                 to="/sign-in"
-                className="bg-BlueLagoon text-white px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
+                className="bg-white text-BlueLagoon px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
               >
                 Sign In
               </Link>
             ) : (
               <Menu as="div" className="relative">
-                <Menu.Button className="flex items-center text-gray-700 hover:text-BlueLagoon">
+                <Menu.Button className="flex items-center text-white hover:opacity-80">
                   <HiMenu className="h-6 w-6" />
                   {dbUser && (
                     <span className="ml-2 text-sm hidden md:inline">
