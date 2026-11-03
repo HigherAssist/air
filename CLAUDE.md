@@ -141,6 +141,7 @@ npx ampx pipeline-deploy  # CI/CD backend deployment
 - Backend deploys with `npx ampx pipeline-deploy`
 - Frontend builds to `dist/` with `npm run build`
 - Current branch: `dev` | Main branch: `main`
+- Promotion order is always `dev` → `stage` → `main` (prod, serves hireassist.net). Never skip `dev`; merge to `main` only after the user approves on stage.
 
 ---
 

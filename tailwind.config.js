@@ -22,6 +22,21 @@ export default {
         FrenchPass: "#B3EAFF",
         Madang: "#C2F0C2",
         EarlyDawn: "#FFF9E5",
+        DeepSea: "#06252D",
+        DeepSeaLight: "#0B3540",
+      },
+      keyframes: {
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        marquee: {
+          to: { transform: "translateX(-50%)" },
+        },
+      },
+      animation: {
+        float: "float 6s ease-in-out infinite",
+        marquee: "marquee 40s linear infinite",
       },
     },
   },
