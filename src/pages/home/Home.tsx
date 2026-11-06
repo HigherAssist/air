@@ -108,8 +108,8 @@ const Home = () => {
           <div>
             <Eyebrow>Applied AI · Data · Results</Eyebrow>
             <h1 className="mb-6 mt-5 text-4xl font-extrabold leading-tight tracking-tight text-DeepSea sm:text-5xl lg:text-6xl">
-              Practical, <span className={`${serif} ${gradText}`}>safe</span>{' '}
-              AI that solves real-world problems.
+              Monetize your data and AI{' '}
+              <span className={`${serif} ${gradText}`}>safely</span>.
             </h1>
             <p className="max-w-xl text-lg text-gray-600 lg:text-xl">
               HireAssist engineers Applied AI skills and data solutions that
@@ -339,7 +339,7 @@ const Home = () => {
         className="overflow-hidden border-y border-Iron bg-white py-16"
       >
         <p className="mb-6 text-center text-sm font-medium text-gray-500">
-          Accelerating ROI across many industries
+          Accelerating safe AI and data monetization across many industries
         </p>
         <div
           className="flex w-max animate-marquee motion-reduce:animate-none"

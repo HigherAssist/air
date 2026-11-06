@@ -13,7 +13,7 @@ const PrivacyPolicy = () => {
       <div className="md:w-2/3 mx-auto p-4">
         <h1 className="text-3xl font-medium mb-2">Who we are</h1>
         <Paragraph>
-          We are AIR. Our website address is:{' '}
+          We are HireAssist. Our website address is:{' '}
           <a className="text-blue-500" href="https://hireassist.net">
             https://hireassist.net
           </a>
@@ -22,7 +22,7 @@ const PrivacyPolicy = () => {
 
         <h1 className="text-3xl font-medium mb-2">Privacy Policy</h1>
         <Paragraph>
-          Your privacy is important to us. It is AIR's policy to respect your
+          Your privacy is important to us. It is our policy to respect your
           privacy regarding any information we may collect from you across our
           website and other sites or applications we own and operate.
         </Paragraph>
