@@ -7,7 +7,7 @@ const TermsCondition = () => {
         <h1 className="text-3xl font-medium mb-2">Terms of Use</h1>
         <Paragraph>
           THESE TERMS AND CONDITIONS OF USE ("Terms of Use") ARE LEGALLY BINDING
-          BETWEEN YOU AND AIR ("we", "us", "our") THAT YOU FORM BY ACCESSING ANY
+          BETWEEN YOU AND HireAssist ("we", "us", "our") THAT YOU FORM BY ACCESSING ANY
           AREA OF OUR WEBSITE OR ANY AREAS OF SITES THAT LINK TO THESE TERMS OF
           USE ("Website"). YOUR CONTINUED ACCESS OR USE OF THE WEBSITE FOLLOWING
           CHANGES TO THESE TERMS OF USE WILL CONSTITUTE YOUR ACCEPTANCE OF ANY
@@ -25,8 +25,8 @@ const TermsCondition = () => {
         <Heading2>WHO WE ARE AND HOW TO CONTACT US</Heading2>
         <Paragraph>
           To contact us, please email{' '}
-          <a className="text-blue-500" href="mailto:operations@air-app.com">
-            operations@air-app.com
+          <a className="text-blue-500" href="mailto:operations@hireassist.net">
+            operations@hireassist.net
           </a>
           .
         </Paragraph>
