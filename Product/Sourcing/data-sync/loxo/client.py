@@ -39,7 +39,7 @@ class LoxoClient:
         max_retries: int = 3,
     ):
         self.base_url = (base_url or os.getenv("LOXO_BASE_URL", "https://app.loxo.co/api")).rstrip("/")
-        self.agency_slug = agency_slug or os.getenv("LOXO_AGENCY_SLUG", "artizen-staffing")
+        self.agency_slug = agency_slug or os.getenv("LOXO_AGENCY_SLUG", "artizen-talent-solutions")
         username = username or os.getenv("LOXO_USERNAME", "")
         password = password or os.getenv("LOXO_PASSWORD", "")
         self.auth_header = _build_auth_header(username, password)

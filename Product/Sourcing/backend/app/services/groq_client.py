@@ -42,6 +42,9 @@ async def chat_completion(
         "temperature": temperature if temperature is not None else settings.GROQ_TEMPERATURE,
         "max_tokens": max_tokens or settings.GROQ_MAX_TOKENS,
     }
+    if settings.GROQ_REASONING_EFFORT:
+        # groq SDK 0.12 predates reasoning_effort, so send it as a raw body field
+        kwargs["extra_body"] = {"reasoning_effort": settings.GROQ_REASONING_EFFORT}
     if tools:
         kwargs["tools"] = tools
         kwargs["tool_choice"] = tool_choice

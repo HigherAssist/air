@@ -170,6 +170,17 @@ These are bugs that have bitten us — always verify against this list before wr
 - Only retry on 5xx server errors and network/timeout failures
 - See `data_sync/loxo/client.py` `_get()` for the implementation
 
+**Agency slug — renamed Nov 2026:**
+- API base is `https://app.loxo.co/api/artizen-talent-solutions` (was `artizen-staffing`; old slug now 404s). Same API credentials.
+- Slug comes from `LOXO_AGENCY_SLUG` in Secrets Manager `sourcing/dev` (code defaults are only fallbacks)
+- 404 with valid creds = wrong slug; 403 = bad/missing creds (Loxo returns 403 for any slug without auth)
+- The numeric ID in Loxo UI settings URLs (`/agencies/27101/...`) does NOT work in API paths
+
+### Groq Model
+- `llama-3.3-70b-versatile` was retired (Nov 2026); now `qwen/qwen3.8-27b` with `GROQ_REASONING_EFFORT=none`
+- Avoid reasoning-on models for scoring: reasoning tokens count toward `max_tokens` and matcher's 400-token cap truncates the JSON
+- A retired model makes matching report "OK" with 0 scores computed — check `scores_computed`, not just status
+
 ### Data Sync Architecture
 
 - All candidates synced via `sync_all_candidates()` regardless of status — only `do_not_contact` (30205) and `bad_data` (30206) are excluded

@@ -22,7 +22,11 @@ class Settings(BaseSettings):
     # Groq LLM
     # ------------------------------------------------------------------ #
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    # llama-3.3-70b-versatile was retired by Groq (~Nov 2026). Qwen with reasoning
+    # disabled behaves like a classic chat model and fits the existing token budgets
+    # (matcher.py scores with max_tokens=400; reasoning tokens would truncate the JSON).
+    GROQ_MODEL: str = "qwen/qwen3.8-27b"
+    GROQ_REASONING_EFFORT: str = "none"  # "" to omit; reasoning models only
     GROQ_TEMPERATURE: float = 0.1        # Conservative: grounded, factual answers
     GROQ_MAX_TOKENS: int = 2048
     GROQ_TIMEOUT_SECONDS: int = 45       # Configurable response timeout
@@ -31,7 +35,7 @@ class Settings(BaseSettings):
     # Loxo ATS API
     # ------------------------------------------------------------------ #
     LOXO_BASE_URL: str = "https://app.loxo.co/api"
-    LOXO_AGENCY_SLUG: str = "artizen-staffing"
+    LOXO_AGENCY_SLUG: str = "artizen-talent-solutions"
     LOXO_USERNAME: str = ""
     LOXO_PASSWORD: str = ""
     LOXO_REQUEST_SLEEP: float = 0.25     # Seconds between bulk API requests
